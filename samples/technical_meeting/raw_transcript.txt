@@ -1,0 +1,17 @@
+[00:00] Speaker 1: Let's review the model results.
+[00:02] Speaker 1: Priya, how did training go?
+[00:04] Speaker 2: We fine-tuned the BERT base model with PyTorch on two A100s.
+[00:08] Speaker 2: I used the Atom Optimizer with a learning rate of 3e-4, and a cosine schedule with warm-up.
+[00:15] Speaker 1: What about the eigenvalue problem in the PCA step?
+[00:18] Speaker 3: The covariance matrix was singular, so the agent decomposition failed.
+[00:23] Speaker 3: I switched to SVD in NumPy, and now the top 50 principal components explain 90% of the variants.
+[00:32] Speaker 1: Good. Did we check the L2 norm of the gradients?
+[00:35] Speaker 3: Yes. Gradient clipping fixed the exploding gradients, and the F1 score went up to 0.87.
+[00:43] Speaker 4: Hi, this is Tom. For deployment, I'll export the model to ONYX and serve it with Tensor RT on the GPU nodes in our Kubernetes cluster.
+[00:52] Speaker 1: Will latency stay under 50 milliseconds at the P99?
+[00:56] Speaker 4: Not yet. With a batch size of 32 it's about 70 milliseconds.
+[01:01] Speaker 4: I'll profile it with insight and try and date quantization.
+[01:05] Speaker 1: Okay. We decided to keep the cross entropy loss and not switch to focal loss.
+[01:11] Speaker 1: Arjun, can you write up the A-B test plan by Thursday?
+[01:14] Speaker 3: Sure, I'll have the A-B test plan ready by Thursday.
+[01:18] Speaker 1: Great. Let's also log every run to weights and biases. Thanks, everyone.

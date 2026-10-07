@@ -204,3 +204,16 @@ def test_addressed_means_said_to_someone(quote: str, ok: bool) -> None:
     name = "Neha" if "Neha" in quote else "Rahul"
     problem = check_guess(guess("Speaker 2", name, "addressed_then_answered", quote), segments, {"Speaker 1", "Speaker 2"})
     assert (problem is None) is ok
+
+
+def test_addressed_name_hints_find_names_not_interjections() -> None:
+    from app.pipeline.speaker_names import addressed_name_hints
+
+    segments = [
+        Segment(start=0, end=1, text="Let's review the results. Priya, how did training go?"),
+        Segment(start=1, end=2, text="Okay, great, thanks."),
+        Segment(start=2, end=3, text="Can you take a look, Arjun?"),
+        Segment(start=3, end=4, text="Rahul said the build is green."),
+    ]
+
+    assert addressed_name_hints(segments, 0, 4) == ["[0] Priya", "[2] Arjun"]

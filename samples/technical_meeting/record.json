@@ -1,0 +1,159 @@
+{
+  "summary": "During the meeting the team reviewed recent model training and evaluation results, noting successful fine‑tuning of a BERT base model and an F1 score increase after gradient clipping. They addressed PCA issues by switching to SVD and discussed deployment plans including exporting to ONNX and serving with TensorRT. Decisions were made to retain cross‑entropy loss, log runs to weights and biases, and to proceed with the outlined deployment strategy. Action items include writing an A/B test plan by Thursday, profiling latency and exploring quantization, and exporting the model for deployment. The meeting concluded with a commitment to monitor latency and continue optimization.",
+  "minutes": [
+    {
+      "topic": "Training details",
+      "points": [
+        "Fine‑tuned BERT base on two A100 GPUs",
+        "Used Adam optimizer with lr 3e-4 and cosine schedule",
+        "Training successful"
+      ],
+      "segment_ids": [
+        2,
+        3
+      ]
+    },
+    {
+      "topic": "PCA issue resolution",
+      "points": [
+        "Covariance matrix singular, eigen decomposition failed",
+        "Switched to SVD in NumPy",
+        "Top 50 PCs explain 90% variance"
+      ],
+      "segment_ids": [
+        5,
+        6
+      ]
+    },
+    {
+      "topic": "Gradient clipping and metrics",
+      "points": [
+        "Checked L2 norm of gradients",
+        "Gradient clipping fixed exploding gradients",
+        "F1 score increased to 0.87"
+      ],
+      "segment_ids": [
+        7,
+        8
+      ]
+    },
+    {
+      "topic": "Deployment plan",
+      "points": [
+        "Export model to ONNX",
+        "Serve with TensorRT on GPU nodes in Kubernetes",
+        "Latency 70ms at batch 32",
+        "Plan to profile and try quantization"
+      ],
+      "segment_ids": [
+        9,
+        10,
+        11,
+        12
+      ]
+    },
+    {
+      "topic": "Loss function decision",
+      "points": [
+        "Keep cross‑entropy loss",
+        "Do not switch to focal loss"
+      ],
+      "segment_ids": [
+        13
+      ]
+    },
+    {
+      "topic": "A/B test plan",
+      "points": [
+        "Arjun to write A/B test plan by Thursday"
+      ],
+      "segment_ids": [
+        14,
+        15
+      ]
+    },
+    {
+      "topic": "Logging",
+      "points": [
+        "Log every run to weights and biases"
+      ],
+      "segment_ids": [
+        16
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "text": "Keep cross‑entropy loss and not switch to focal loss",
+      "evidence": {
+        "segment_ids": [
+          13
+        ],
+        "quote": "We decided to keep the cross entropy loss and not switch to focal loss",
+        "start": 65.159996
+      }
+    },
+    {
+      "text": "Log every run to weights and biases",
+      "evidence": {
+        "segment_ids": [
+          16
+        ],
+        "quote": "Let's also log every run to weights and biases",
+        "start": 78.439995
+      }
+    }
+  ],
+  "action_items": [
+    {
+      "task": "Export the model to ONNX and serve it with TensorRT on GPU nodes in Kubernetes cluster",
+      "owner": "Tom",
+      "deadline": null,
+      "evidence": {
+        "segment_ids": [
+          9
+        ],
+        "quote": "For deployment, I'll export the model to ONNX and serve it with TensorRT on the GPU nodes in our Kubernetes cluster",
+        "start": 43.34
+      }
+    },
+    {
+      "task": "Write up the A/B test plan by Thursday",
+      "owner": "Arjun",
+      "deadline": "Thursday",
+      "evidence": {
+        "segment_ids": [
+          15
+        ],
+        "quote": "I'll have the A/B test plan ready by Thursday",
+        "start": 74.35999
+      }
+    },
+    {
+      "task": "Profile latency with insight and try and date quantization",
+      "owner": "Tom",
+      "deadline": null,
+      "evidence": {
+        "segment_ids": [
+          12
+        ],
+        "quote": "I'll profile it with insight and try and date quantization",
+        "start": 61.879997
+      }
+    },
+    {
+      "task": "Log every run to weights and biases",
+      "owner": null,
+      "deadline": null,
+      "evidence": {
+        "segment_ids": [
+          16
+        ],
+        "quote": "Let's also log every run to weights and biases",
+        "start": 78.439995
+      }
+    }
+  ],
+  "open_items": [],
+  "warnings": []
+}

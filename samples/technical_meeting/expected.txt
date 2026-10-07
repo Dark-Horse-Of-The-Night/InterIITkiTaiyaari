@@ -1,0 +1,43 @@
+Script (who says what):
+  Host   | Let's review the model results. Priya, how did training go?
+  Priya  | We fine tuned the bert base model with pie torch on two A one hundreds.
+  Priya  | I used the atom optimizer with a learning rate of three e minus four, and a cosine schedule with warm up.
+  Host   | What about the eigen value problem in the P C A step?
+  Arjun  | The covariance matrix was singular, so the eigen decomposition failed.
+  Arjun  | I switched to S V D in num pie, and now the top fifty principal components explain ninety percent of the variance.
+  Host   | Good. Did we check the L two norm of the gradients?
+  Arjun  | Yes. Gradient clipping fixed the exploding gradients, and the F one score went up to zero point eight seven.
+  Tom    | Hi, this is Tom. For deployment, I'll export the model to onyx and serve it with tensor R T on the G P U nodes in our cube er netties cluster.
+  Host   | Will latency stay under fifty milliseconds at the P ninety nine?
+  Tom    | Not yet. With a batch size of thirty two it's about seventy milliseconds. I'll profile it with en sight and try int eight quantization.
+  Host   | Okay. We decided to keep the cross entropy loss and not switch to focal loss.
+  Host   | Arjun, can you write up the a b test plan by Thursday?
+  Arjun  | Sure, I'll have the A B test plan ready by Thursday.
+  Host   | Great. Let's also log every run to weights and biases. Thanks, everyone.
+
+Terms the refiner should fix (if speech recognition writes them as spoken):
+  bert -> BERT
+  pie torch -> PyTorch
+  A one hundreds -> A100s
+  atom optimizer -> Adam optimizer
+  eigen value / eigen decomposition -> eigenvalue / eigendecomposition
+  P C A -> PCA
+  S V D -> SVD
+  num pie -> NumPy
+  L two norm -> L2 norm
+  F one score -> F1 score
+  onyx -> ONNX
+  tensor R T -> TensorRT
+  G P U -> GPU
+  cube er netties -> Kubernetes
+  P ninety nine -> P99
+  en sight -> Nsight
+  int eight -> INT8
+  a b test -> A/B test
+  weights and biases -> Weights & Biases
+
+Must stay exactly as spoken:
+  Names: Priya, Arjun, Tom
+  Numbers: 'three e minus four', 'fifty', 'ninety percent', 'zero point eight seven', 'thirty two', 'seventy milliseconds', 'by Thursday'
+  Negations: 'Not yet', 'not switch to focal loss'
+  Commitments: 'I'll export', 'I'll profile', 'I'll have ... ready', 'We decided'

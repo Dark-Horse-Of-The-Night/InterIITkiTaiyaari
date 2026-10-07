@@ -28,6 +28,12 @@ OUTPUT_TOKENS = 1500
 LABEL_PATTERN = re.compile(r"^Speaker \d+$")
 NAME_PATTERN = re.compile(r"^[A-Z][a-zA-Z'\-]{1,30}( [A-Z][a-zA-Z'\-]{1,30})?$")  # "Neha", "Mary-Jane", "Tom Lee"
 NOT_A_NAME = {"Speaker", "Everyone", "Team", "Guys", "Folks", "Someone", "Nobody", "Okay", "Thanks", "Sure", "Hi", "Hello"}
+# Capitalised words that often come before a comma but are not names (for the hints below).
+COMMON_WORDS = NOT_A_NAME | {
+    "Yes", "No", "Yeah", "Well", "So", "Good", "Great", "Right", "Alright", "Also", "And", "But", "Now", "Then",
+    "First", "Second", "Third", "Next", "Finally", "Actually", "Anyway", "Last", "Quick", "Ok", "Oh", "Hey",
+    "Morning", "Perfect", "Cool", "Fine", "Agreed", "Exactly", "Sorry", "Please", "Look", "Listen", "Thank",
+}
 HOW_TEXT = {
     "introduced_themselves": "introduced themselves",
     "addressed_then_answered": "was addressed by name and answered",
@@ -63,6 +69,9 @@ def name_speakers(
     guesses: list[NameGuess] = []
     for first, end in _parts(segments, max(room, 500)):
         text = "\n".join(f"[{i}] ({format_time(segments[i].start)}) {segments[i].speaker}: {segments[i].text}" for i in range(first, end))
+        hints = addressed_name_hints(segments, first, end)
+        if hints:
+            text += "\n\nLines that may address someone by name (check each one; they are hints, not proof):\n" + "\n".join(hints)
         try:
             reply = request_structured(
                 client, model, system_prompt, text, "speaker_names", schema, NameGuesses.model_validate_json,
@@ -141,6 +150,20 @@ def check_guess(guess: NameGuess, segments: list[Segment], labels: set[str]) -> 
         if segment.speaker != quote_speaker:
             return None if segment.speaker == guess.speaker else "someone else answered"
     return "nobody answered"
+
+
+def addressed_name_hints(segments: list[Segment], first: int, end: int) -> list[str]:
+    """Lines where a capitalised word is followed by a comma or question mark, e.g. "Priya, how did…".
+
+    Only a hint for the model (which still has to give evidence, which code still checks).
+    """
+    hints = []
+    for i in range(first, end):
+        candidates = re.findall(r"(?:^|[.!?]\s+|,\s*)([A-Z][a-z]{1,30})\s*[,?!]", segments[i].text)
+        names = [c for c in candidates if c not in COMMON_WORDS]
+        if names:
+            hints.append(f"[{i}] {', '.join(dict.fromkeys(names))}")
+    return hints
 
 
 def _parts(segments: list[Segment], max_tokens: int) -> list[tuple[int, int]]:
