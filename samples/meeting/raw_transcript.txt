@@ -1,11 +1,11 @@
-[00:00] Okay everyone, let's start the sprint planning.
-[00:02] First item.
-[00:03] Priya said the Kubernetes cluster keeps running out of memory,
-[00:07] so she will move the PostgreSQL database to a managed instance by Friday.
-[00:12] Second item.
-[00:13] Arjun proposed switching our CICD pipeline from Jenkins to GitHub Actions,
-[00:17] but we haven't agreed on that yet, so let's discuss it next week.
-[00:21] Third item.
-[00:22] We decided to use OAuth with JWT tokens for the new login API.
-[00:27] Someone needs to update the Swagger docs.
-[00:29] but nobody has volunteered. That's all. Thanks.
+[00:00] Speaker 1: Okay everyone, let's start the sprint planning.
+[00:02] Speaker 1: First item.
+[00:03] Speaker 1: Priya said the Kubernetes cluster keeps running out of memory,
+[00:07] Speaker 1: so she will move the PostgreSQL database to a managed instance by Friday.
+[00:12] Speaker 1: Second item.
+[00:13] Speaker 1: Arjun proposed switching our CICD pipeline from Jenkins to GitHub Actions,
+[00:17] Speaker 1: but we haven't agreed on that yet, so let's discuss it next week.
+[00:21] Speaker 1: Third item.
+[00:22] Speaker 1: We decided to use OAuth with JWT tokens for the new login API.
+[00:27] Speaker 1: Someone needs to update the Swagger docs.
+[00:29] Speaker 1: but nobody has volunteered. That's all. Thanks.

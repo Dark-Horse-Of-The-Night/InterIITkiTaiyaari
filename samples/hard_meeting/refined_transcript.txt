@@ -1,19 +1,19 @@
-[00:00] Good morning. Let's review the mobile release.
-[00:02] First, the crash on Android.
-[00:04] Neha found that the crash comes from the image cache.
-[00:07] Neha, can you fix it by March 3rd?
-[00:10] Sure. I'll have the fix ready by March 3rd.
-[00:13] Next. Tom suggested we move our analytics from Firebase to Mixpanel.
-[00:17] Honestly, I think that's a good idea.
-[00:20] Okay. Let's do that.
-[00:21] We'll switch to Mixpanel.
-[00:23] About the beta. I'll take care of the beta testers list.
-[00:26] Maybe John could look at the push notification bug?
-[00:29] Anyway, we should send out the release notes soon.
-[00:32] Now, Dark Mode.
-[00:34] Last week we said we would ship Dark Mode in this release.
-[00:37] Actually, let's not.
-[00:39] Let's move Dark Mode to the next release.
-[00:41] Last thing, does anyone know if the App Store review takes a week?
-[00:45] No idea.
-[00:46] Okay, thanks everyone.
+[00:00] Speaker 1: Good morning. Let's review the mobile release.
+[00:02] Speaker 1: First, the crash on Android.
+[00:04] Speaker 1: Neha found that the crash comes from the image cache.
+[00:07] Speaker 1: Neha, can you fix it by March 3rd?
+[00:10] Speaker 1: Sure, I'll have the fix ready by March 3rd.
+[00:13] Speaker 1: Next, Tom suggested we move our analytics from Firebase to Mixpanel.
+[00:17] Speaker 1: Honestly, I think that's a good idea.
+[00:20] Speaker 1: Okay, let's do that.
+[00:21] Speaker 1: We'll switch to Mixpanel.
+[00:23] Speaker 1: About the beta, I'll take care of the beta testers list.
+[00:26] Speaker 1: Maybe John could look at the push notification bog?
+[00:29] Speaker 1: Anyway, we should send out the release notes soon.
+[00:32] Speaker 1: Now, Dark Mode.
+[00:34] Speaker 1: Last week we said we would ship Dark Mode in this release.
+[00:37] Speaker 1: Actually, let's not.
+[00:39] Speaker 1: Let's move Dark Mode to the next release.
+[00:41] Speaker 1: Last thing, does anyone know if the App Store review takes a week?
+[00:45] Speaker 1: No idea.
+[00:46] Speaker 1: Okay, thanks everyone.

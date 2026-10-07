@@ -2,56 +2,52 @@
 
 ## Summary
 
-The team reviewed the mobile release, covering an Android crash, analytics migration, beta testing, and Dark Mode. Neha was assigned to fix the crash by March 3rd, and the group decided to switch analytics to Mixpanel and postpone Dark Mode to the next release. Open items include investigating a push notification bug, sending release notes, and confirming the App Store review timeline.
+The meeting reviewed the upcoming mobile release, covering an Android crash, analytics migration, beta‑testing tasks, Dark Mode timing, and App Store review questions. The team assigned Neha to fix the crash by March 3rd, agreed to switch analytics to Mixpanel, postponed Dark Mode to the next release, and noted pending items such as the push‑notification bug and release‑notes distribution.
 
 ## Minutes
 
-### Android crash
+### Android crash fix
 
 - Crash caused by image cache
-- Neha assigned to fix the crash
-- Fix to be ready by March 3rd
+- Neha assigned to fix
+- Deadline March 3rd
 
 ### Analytics migration
 
-- Suggestion to move analytics from Firebase to Mixpanel
-- Agreement to switch to Mixpanel
+- Tom suggested moving from Firebase to Mixpanel
+- Group agreed to switch
+- Implementation will use Mixpanel
 
-### Beta testers list
+### Beta testing and release notes
 
-- Commitment to handle beta testers list
+- Speaker will handle beta testers list
+- Push notification bug needs investigation
+- Release notes to be sent soon
 
-### Push notification bug
+### Dark Mode schedule
 
-- Proposal for John to investigate the push notification bug
+- Originally planned for this release
+- Decision to postpone
+- Will ship in next release
 
-### Release notes
+### App Store review timing
 
-- Suggestion to send out release notes soon
-
-### Dark Mode
-
-- Initially planned for this release
-- Decision to postpone Dark Mode to next release
-
-### App Store review time
-
-- Question about whether App Store review takes a week
+- Question about review duration
+- No answer provided
 
 ## Key decisions
 
-1. Switch analytics from Firebase to Mixpanel _(00:20: "Okay. Let's do that.")_
+1. Switch to Mixpanel _(00:21: "We'll switch to Mixpanel.")_
 2. Move Dark Mode to the next release _(00:39: "Let's move Dark Mode to the next release.")_
 
 ## Action items
 
 | # | Task | Owner | Deadline | Source |
 |---|------|-------|----------|--------|
-| 1 | Fix Android crash caused by image cache | Neha | March 3rd | 00:10 |
-| 2 | Compile beta testers list | Unspecified | Unspecified | 00:23 |
+| 1 | Fix Android crash from image cache | Neha | by March 3rd | 00:10 |
+| 2 | Prepare beta testers list | Unspecified | Unspecified | 00:23 |
 
 ## Open proposals and questions
 
-- **Proposal:** John could look at the push notification bug _(00:26: "Maybe John could look at the push notification bug?")_
-- **Proposal:** Send out the release notes soon _(00:29: "we should send out the release notes soon.")_
+- **Proposal:** John could look at the push notification bug _(00:26: "Maybe John could look at the push notification bog?")_
 - **Question:** Does the App Store review take a week? _(00:41: "does anyone know if the App Store review takes a week?")_

@@ -1,12 +1,12 @@
 {
-  "summary": "The team reviewed the mobile release, covering an Android crash, analytics migration, beta testing, and Dark Mode. Neha was assigned to fix the crash by March 3rd, and the group decided to switch analytics to Mixpanel and postpone Dark Mode to the next release. Open items include investigating a push notification bug, sending release notes, and confirming the App Store review timeline.",
+  "summary": "The meeting reviewed the upcoming mobile release, covering an Android crash, analytics migration, beta‑testing tasks, Dark Mode timing, and App Store review questions. The team assigned Neha to fix the crash by March 3rd, agreed to switch analytics to Mixpanel, postponed Dark Mode to the next release, and noted pending items such as the push‑notification bug and release‑notes distribution.",
   "minutes": [
     {
-      "topic": "Android crash",
+      "topic": "Android crash fix",
       "points": [
         "Crash caused by image cache",
-        "Neha assigned to fix the crash",
-        "Fix to be ready by March 3rd"
+        "Neha assigned to fix",
+        "Deadline March 3rd"
       ],
       "segment_ids": [
         1,
@@ -18,8 +18,9 @@
     {
       "topic": "Analytics migration",
       "points": [
-        "Suggestion to move analytics from Firebase to Mixpanel",
-        "Agreement to switch to Mixpanel"
+        "Tom suggested moving from Firebase to Mixpanel",
+        "Group agreed to switch",
+        "Implementation will use Mixpanel"
       ],
       "segment_ids": [
         5,
@@ -29,37 +30,24 @@
       ]
     },
     {
-      "topic": "Beta testers list",
+      "topic": "Beta testing and release notes",
       "points": [
-        "Commitment to handle beta testers list"
+        "Speaker will handle beta testers list",
+        "Push notification bug needs investigation",
+        "Release notes to be sent soon"
       ],
       "segment_ids": [
-        9
-      ]
-    },
-    {
-      "topic": "Push notification bug",
-      "points": [
-        "Proposal for John to investigate the push notification bug"
-      ],
-      "segment_ids": [
-        10
-      ]
-    },
-    {
-      "topic": "Release notes",
-      "points": [
-        "Suggestion to send out release notes soon"
-      ],
-      "segment_ids": [
+        9,
+        10,
         11
       ]
     },
     {
-      "topic": "Dark Mode",
+      "topic": "Dark Mode schedule",
       "points": [
-        "Initially planned for this release",
-        "Decision to postpone Dark Mode to next release"
+        "Originally planned for this release",
+        "Decision to postpone",
+        "Will ship in next release"
       ],
       "segment_ids": [
         12,
@@ -69,9 +57,10 @@
       ]
     },
     {
-      "topic": "App Store review time",
+      "topic": "App Store review timing",
       "points": [
-        "Question about whether App Store review takes a week"
+        "Question about review duration",
+        "No answer provided"
       ],
       "segment_ids": [
         16,
@@ -81,13 +70,13 @@
   ],
   "decisions": [
     {
-      "text": "Switch analytics from Firebase to Mixpanel",
+      "text": "Switch to Mixpanel",
       "evidence": {
         "segment_ids": [
-          7
+          8
         ],
-        "quote": "Okay. Let's do that.",
-        "start": 20.1
+        "quote": "We'll switch to Mixpanel.",
+        "start": 21.9
       }
     },
     {
@@ -103,19 +92,19 @@
   ],
   "action_items": [
     {
-      "task": "Fix Android crash caused by image cache",
+      "task": "Fix Android crash from image cache",
       "owner": "Neha",
-      "deadline": "March 3rd",
+      "deadline": "by March 3rd",
       "evidence": {
         "segment_ids": [
           4
         ],
-        "quote": "Sure. I'll have the fix ready by March 3rd.",
+        "quote": "I'll have the fix ready by March 3rd.",
         "start": 10.34
       }
     },
     {
-      "task": "Compile beta testers list",
+      "task": "Prepare beta testers list",
       "owner": null,
       "deadline": null,
       "evidence": {
@@ -136,20 +125,8 @@
         "segment_ids": [
           10
         ],
-        "quote": "Maybe John could look at the push notification bug?",
+        "quote": "Maybe John could look at the push notification bog?",
         "start": 26.82
-      }
-    },
-    {
-      "text": "Send out the release notes soon",
-      "kind": "proposal",
-      "raised_by": null,
-      "evidence": {
-        "segment_ids": [
-          11
-        ],
-        "quote": "we should send out the release notes soon.",
-        "start": 29.439999
       }
     },
     {

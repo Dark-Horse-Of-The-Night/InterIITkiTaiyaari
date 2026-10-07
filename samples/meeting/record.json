@@ -1,12 +1,11 @@
 {
-  "summary": "The team discussed the Kubernetes memory issue and planned to migrate the PostgreSQL database to a managed instance by Friday. They considered switching the CI/CD pipeline to GitHub Actions but postponed the decision. They decided to implement OAuth with JWT tokens for the new login API. An open need was identified to update the Swagger documentation.",
+  "summary": "The team began sprint planning and addressed a Kubernetes memory issue, planning to migrate PostgreSQL to a managed instance by Friday. They discussed a proposal to switch the CI/CD pipeline from Jenkins to GitHub Actions, which will be revisited next week. A decision was made to use OAuth with JWT tokens for the new login API, and the need to update the Swagger documentation was noted.",
   "minutes": [
     {
-      "topic": "Kubernetes memory issue and DB migration",
+      "topic": "Kubernetes memory issue & DB migration",
       "points": [
         "Kubernetes cluster runs out of memory",
-        "Plan to move PostgreSQL to a managed instance",
-        "Deadline set for Friday"
+        "Move PostgreSQL to a managed instance by Friday"
       ],
       "segment_ids": [
         2,
@@ -16,8 +15,7 @@
     {
       "topic": "CI/CD pipeline proposal",
       "points": [
-        "Arjun proposed switching from Jenkins to GitHub Actions",
-        "Decision postponed; to discuss next week"
+        "Switch CI/CD from Jenkins to GitHub Actions"
       ],
       "segment_ids": [
         5,
@@ -27,21 +25,19 @@
     {
       "topic": "Authentication decision",
       "points": [
-        "Decided to use OAuth with JWT tokens for the new login API"
+        "Use OAuth with JWT tokens for new login API"
       ],
       "segment_ids": [
         8
       ]
     },
     {
-      "topic": "Swagger documentation update",
+      "topic": "Swagger documentation",
       "points": [
-        "Need to update the Swagger docs",
-        "No volunteer yet"
+        "Update Swagger docs needed"
       ],
       "segment_ids": [
-        9,
-        10
+        9
       ]
     }
   ],
@@ -59,7 +55,7 @@
   ],
   "action_items": [
     {
-      "task": "Move PostgreSQL database to a managed instance",
+      "task": "Move the PostgreSQL database to a managed instance",
       "owner": "Priya",
       "deadline": "by Friday",
       "evidence": {
@@ -71,7 +67,7 @@
       }
     },
     {
-      "task": "Update Swagger documentation",
+      "task": "Update the Swagger docs",
       "owner": null,
       "deadline": null,
       "evidence": {
@@ -93,7 +89,7 @@
           5
         ],
         "quote": "Arjun proposed switching our CI/CD pipeline from Jenkins to GitHub Actions,",
-        "start": 13.059999
+        "start": 13.04
       }
     }
   ],

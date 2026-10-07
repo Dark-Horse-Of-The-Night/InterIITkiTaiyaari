@@ -2,29 +2,26 @@
 
 ## Summary
 
-The team discussed the Kubernetes memory issue and planned to migrate the PostgreSQL database to a managed instance by Friday. They considered switching the CI/CD pipeline to GitHub Actions but postponed the decision. They decided to implement OAuth with JWT tokens for the new login API. An open need was identified to update the Swagger documentation.
+The team began sprint planning and addressed a Kubernetes memory issue, planning to migrate PostgreSQL to a managed instance by Friday. They discussed a proposal to switch the CI/CD pipeline from Jenkins to GitHub Actions, which will be revisited next week. A decision was made to use OAuth with JWT tokens for the new login API, and the need to update the Swagger documentation was noted.
 
 ## Minutes
 
-### Kubernetes memory issue and DB migration
+### Kubernetes memory issue & DB migration
 
 - Kubernetes cluster runs out of memory
-- Plan to move PostgreSQL to a managed instance
-- Deadline set for Friday
+- Move PostgreSQL to a managed instance by Friday
 
 ### CI/CD pipeline proposal
 
-- Arjun proposed switching from Jenkins to GitHub Actions
-- Decision postponed; to discuss next week
+- Switch CI/CD from Jenkins to GitHub Actions
 
 ### Authentication decision
 
-- Decided to use OAuth with JWT tokens for the new login API
+- Use OAuth with JWT tokens for new login API
 
-### Swagger documentation update
+### Swagger documentation
 
-- Need to update the Swagger docs
-- No volunteer yet
+- Update Swagger docs needed
 
 ## Key decisions
 
@@ -34,8 +31,8 @@ The team discussed the Kubernetes memory issue and planned to migrate the Postgr
 
 | # | Task | Owner | Deadline | Source |
 |---|------|-------|----------|--------|
-| 1 | Move PostgreSQL database to a managed instance | Priya | by Friday | 00:07 |
-| 2 | Update Swagger documentation | Unspecified | Unspecified | 00:27 |
+| 1 | Move the PostgreSQL database to a managed instance | Priya | by Friday | 00:07 |
+| 2 | Update the Swagger docs | Unspecified | Unspecified | 00:27 |
 
 ## Open proposals and questions
 
