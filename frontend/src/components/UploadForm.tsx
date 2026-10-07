@@ -145,7 +145,7 @@ export default function UploadForm({ onSubmit, uploading }: Props) {
         <button
           type="submit"
           disabled={!file || uploading}
-          className="display focus-ring flex min-h-[60px] cursor-pointer items-center justify-center gap-2.5 rounded-full bg-orange text-xl text-ink shadow-[0_7px_0_var(--color-orange-deep)] transition-all hover:-translate-y-0.5 hover:shadow-[0_9px_0_var(--color-orange-deep)] active:translate-y-1 active:shadow-[0_3px_0_var(--color-orange-deep)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          className="display focus-ring flex min-h-[60px] cursor-pointer items-center justify-center gap-2.5 rounded-full bg-orange text-xl text-ink shadow-[0_7px_0_var(--color-orange-deep)] transition-all hover:-translate-y-0.5 hover:shadow-[0_9px_0_var(--color-orange-deep)] active:translate-y-1 active:shadow-[0_3px_0_var(--color-orange-deep)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
         >
           {uploading ? 'Uploading…' : 'Make my minutes'}
           {!uploading && <ArrowRightIcon size={22} strokeWidth={2.6} />}
