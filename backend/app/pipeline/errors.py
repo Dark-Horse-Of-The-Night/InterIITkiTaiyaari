@@ -4,6 +4,7 @@
 STAGE_FILE_CHECK = "File check"
 STAGE_STT = "Speech-to-text"
 STAGE_REFINER = "Refiner"
+STAGE_DOCUMENTER = "Documenter"
 
 
 class PipelineError(Exception):

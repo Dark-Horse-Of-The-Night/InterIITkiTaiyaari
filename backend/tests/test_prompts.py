@@ -14,3 +14,10 @@ def test_refiner_prompt_contains_key_rules() -> None:
 def test_missing_prompt_raises() -> None:
     with pytest.raises(FileNotFoundError):
         load_prompt("does_not_exist")
+
+
+def test_documenter_prompt_contains_key_rules() -> None:
+    prompt = load_prompt("documenter")
+
+    for rule in ["proposal is not a decision", "unaccepted suggestion is not a task", "Never invent them", "quote"]:
+        assert rule in prompt

@@ -1,6 +1,8 @@
 """Data shapes passed between pipeline stages."""
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict
 
 
 class Segment(BaseModel):
@@ -39,3 +41,60 @@ class RefinedTranscript(Transcript):
 
     corrections: list[Correction] = []
     warnings: list[str] = []
+
+
+# --- Meeting record (output of the documenter) ---
+# Fields WITH a default (start, warnings) are filled in by code, never by the model:
+# they are left out of the JSON schema the model is asked to follow.
+
+
+class RecordModel(BaseModel):
+    """Base for record parts: unknown fields are rejected, so the model can't add extras."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class Evidence(RecordModel):
+    """Where an item came from: segment ids and an exact quote from those segments."""
+
+    segment_ids: list[int]
+    quote: str
+    start: float | None = None  # seconds; set by code from the first segment
+
+
+class Topic(RecordModel):
+    topic: str
+    points: list[str]
+    segment_ids: list[int]
+
+
+class Decision(RecordModel):
+    text: str
+    evidence: Evidence
+
+
+class ActionItem(RecordModel):
+    task: str
+    owner: str | None  # None = not stated in the recording; shown as "Unspecified"
+    deadline: str | None  # the phrase as spoken, e.g. "by Friday"; None if not stated
+    evidence: Evidence
+
+
+class OpenItem(RecordModel):
+    """A proposal or question that was raised but not agreed. Never a decision or task."""
+
+    text: str
+    kind: Literal["proposal", "question"]
+    raised_by: str | None
+    evidence: Evidence
+
+
+class MeetingRecord(RecordModel):
+    """The structured meeting record. Markdown and JSON are both generated from this."""
+
+    summary: str
+    minutes: list[Topic]
+    decisions: list[Decision]
+    action_items: list[ActionItem]
+    open_items: list[OpenItem]
+    warnings: list[str] = []  # problems the code checks found and fixed

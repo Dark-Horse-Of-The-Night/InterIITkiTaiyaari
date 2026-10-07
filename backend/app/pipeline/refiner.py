@@ -20,6 +20,7 @@ from app.config import Settings
 from app.pipeline.api_errors import explain_api_error
 from app.pipeline.errors import STAGE_REFINER, PipelineError
 from app.pipeline.models import Correction, RefinedTranscript, Segment, Transcript
+from app.pipeline.render import format_time
 from app.prompt_loader import load_prompt
 
 BATCH_SIZE = 40  # segments per request, so long meetings don't hit output limits
@@ -213,8 +214,3 @@ def find_corrections(segment_id: int, original: str, refined: str) -> list[Corre
         for tag, i1, i2, j1, j2 in matcher.get_opcodes()
         if tag != "equal"
     ]
-
-
-def format_time(seconds: float) -> str:
-    minutes, secs = divmod(int(seconds), 60)
-    return f"{minutes:02d}:{secs:02d}"
