@@ -63,11 +63,11 @@ describe('Meeting record tab', () => {
 describe('Transcript tabs', () => {
   it('highlights corrections in the refined transcript with what Whisper heard', async () => {
     renderResults()
-    await userEvent.click(screen.getByRole('tab', { name: 'Refined transcript' }))
+    await userEvent.click(screen.getByRole('tab', { name: /Refined transcript/ }))
 
     const mark = screen.getByText('CI/CD', { selector: 'mark' })
     expect(mark).toHaveAttribute('title', 'Whisper heard: "CICD"')
-    expect(screen.getByText(/1 correction\./)).toBeInTheDocument()
+    expect(screen.getByText('1 term corrected')).toBeInTheDocument()
   })
 
   it('shows the raw transcript unchanged', async () => {
@@ -84,8 +84,8 @@ describe('Downloads', () => {
   it('saves the Markdown and JSON from the same result data', async () => {
     const result = renderResults()
 
-    await userEvent.click(screen.getByRole('button', { name: /Record \(\.md\)/ }))
-    await userEvent.click(screen.getByRole('button', { name: /Record \(\.json\)/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Markdown' }))
+    await userEvent.click(screen.getByRole('button', { name: 'JSON' }))
 
     expect(saved.map((s) => s.name)).toEqual(['Sprint Sync-record.md', 'Sprint Sync-record.json'])
     expect(await saved[0].blob.text()).toBe(result.markdown)
@@ -97,7 +97,7 @@ describe('Downloads', () => {
   it('saves transcripts as timestamped text', async () => {
     renderResults()
 
-    await userEvent.click(screen.getByRole('button', { name: /Raw transcript/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Raw .txt' }))
 
     expect(saved[0].name).toBe('Sprint Sync-raw-transcript.txt')
     expect(await saved[0].blob.text()).toContain('[00:04] Arjun proposed switching our CICD pipeline')

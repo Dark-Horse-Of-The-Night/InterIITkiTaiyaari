@@ -8,6 +8,12 @@ export function formatTime(seconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
+/** 2.5 -> "2.5s"; 225.5 -> "3m 46s" */
+export function formatSeconds(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  return `${Math.floor(seconds / 60)}m ${String(Math.round(seconds % 60)).padStart(2, '0')}s`
+}
+
 /** A transcript as plain text, one "[mm:ss] text" line per segment. */
 export function transcriptToText(transcript: Transcript): string {
   return transcript.segments.map((s) => `[${formatTime(s.start)}] ${s.text}`).join('\n') + '\n'

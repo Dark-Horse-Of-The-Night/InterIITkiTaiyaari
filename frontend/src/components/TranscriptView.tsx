@@ -10,50 +10,84 @@ interface Props {
 }
 
 export default function TranscriptView({ transcript, corrections, warnings = [] }: Props) {
+  const refined = corrections !== undefined
   return (
-    <div className="space-y-4">
-      {corrections && <CorrectionsSummary corrections={corrections} />}
-      {warnings.length > 0 && (
-        <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          <p className="font-medium">Edits the safety checks rejected (original wording kept):</p>
-          <ul className="mt-1 list-disc pl-5">
-            {warnings.map((warning, i) => (
-              <li key={i}>{warning}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <ol className="space-y-1.5">
-        {transcript.segments.map((segment, i) => (
-          <li key={i} className="flex gap-3 text-sm leading-relaxed">
-            <span className="shrink-0 pt-px font-mono text-xs text-slate-400 dark:text-slate-500">{formatTime(segment.start)}</span>
-            <span className="text-slate-800 dark:text-slate-200">
-              {corrections ? highlight(segment.text, corrections.filter((c) => c.segment_id === i)) : segment.text}
-            </span>
-          </li>
-        ))}
-      </ol>
-    </div>
-  )
-}
+    <div className="flex flex-wrap items-start gap-6">
+      <section className="card min-w-0 flex-[999_1_600px] py-2" aria-label="Transcript">
+        <ol>
+          {transcript.segments.map((segment, i) => {
+            const changes = corrections?.filter((c) => c.segment_id === i) ?? []
+            return (
+              <li key={i} className={`flex gap-[18px] px-6 py-2.5 leading-relaxed ${changes.length ? 'bg-accent-soft/40' : ''}`}>
+                <span className="w-11 shrink-0 pt-0.5 font-mono text-[12.5px] text-faint">{formatTime(segment.start)}</span>
+                <span className="min-w-0 text-ink">{changes.length ? highlight(segment.text, changes) : segment.text}</span>
+              </li>
+            )
+          })}
+        </ol>
+      </section>
 
-function CorrectionsSummary({ corrections }: { corrections: Correction[] }) {
-  if (corrections.length === 0) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">The refiner found no technical terms to correct.</p>
-  }
-  return (
-    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
-      <p className="text-sm text-slate-700 dark:text-slate-300">
-        {corrections.length} correction{corrections.length === 1 ? '' : 's'}. Highlighted words were corrected; hover to see
-        what Whisper heard.
-      </p>
-      <ul className="mt-2 flex flex-wrap gap-2">
-        {corrections.map((c, i) => (
-          <li key={i} className="rounded bg-white px-2 py-0.5 text-xs text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">
-            <s className="text-slate-400">{c.before || '(nothing)'}</s> → <span className="font-medium">{c.after || '(removed)'}</span>
-          </li>
-        ))}
-      </ul>
+      <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
+        {refined ? (
+          <>
+            <section className="card p-5">
+              <h2 className="mb-1 text-[15px] font-semibold">
+                {corrections.length === 0 ? 'No terms needed correcting' : `${corrections.length} term${corrections.length === 1 ? '' : 's'} corrected`}
+              </h2>
+              <p className="text-[13.5px] text-muted">
+                {corrections.length === 0
+                  ? 'The refiner found no misheard technical terms.'
+                  : 'Highlighted in the transcript. Hover a highlight to see what Whisper heard.'}
+              </p>
+              {corrections.length > 0 && (
+                <ul className="mt-3.5 flex flex-col gap-2">
+                  {corrections.map((c, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2.5 rounded-[10px] bg-surface-2 px-3 py-2.5">
+                      <span className="min-w-0 font-mono text-[13px]">
+                        <s className="text-faint">{c.before || '(nothing)'}</s> <span className="text-faint">→</span>{' '}
+                        <span className="font-medium text-accent-ink">{c.after || '(removed)'}</span>
+                      </span>
+                      {transcript.segments[c.segment_id] && (
+                        <span className="font-mono text-xs text-muted">{formatTime(transcript.segments[c.segment_id].start)}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="card p-5">
+              <h2 className="mb-2.5 text-[15px] font-semibold">Protected by safety checks</h2>
+              <ul className="flex list-disc flex-col gap-1 pl-[18px] text-[13.5px] text-ink-2">
+                <li>Names, numbers and negations never change</li>
+                <li>
+                  Commitments like <em>will</em> or <em>decided</em> stay as spoken
+                </li>
+                <li>Edits that rewrite a sentence are rejected</li>
+              </ul>
+              {warnings.length === 0 ? (
+                <p className="mt-3 border-t border-line-soft pt-3 text-[13px] text-muted">No edits were rejected in this meeting.</p>
+              ) : (
+                <div className="mt-3 border-t border-line-soft pt-3">
+                  <p className="text-[13px] font-medium text-warn-ink">Edits rejected (original wording kept):</p>
+                  <ul className="mt-1 flex list-disc flex-col gap-1 pl-[18px] text-[13px] text-ink-2">
+                    {warnings.map((warning, i) => (
+                      <li key={i}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          </>
+        ) : (
+          <section className="card p-5">
+            <h2 className="mb-1 text-[15px] font-semibold">Exactly as heard</h2>
+            <p className="text-[13.5px] text-muted">
+              Whisper's original transcript, before any corrections. Compare with the refined transcript to see what changed.
+            </p>
+          </section>
+        )}
+      </aside>
     </div>
   )
 }
@@ -71,7 +105,7 @@ function highlight(text: string, corrections: Correction[]): ReactNode {
       <mark
         key={i}
         title={`Whisper heard: "${correction.before}"`}
-        className="rounded bg-emerald-100 px-0.5 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-100"
+        className="rounded bg-mark px-1 text-mark-ink underline decoration-dotted underline-offset-[3px]"
       >
         {correction.after}
       </mark>,
