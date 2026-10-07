@@ -165,8 +165,8 @@ def test_retry_succeeds_after_one_bad_reply() -> None:
 def test_api_errors_name_documenter_settings() -> None:
     error = openai.RateLimitError("slow down", response=httpx.Response(429, request=FAKE_REQUEST), body=None)
 
-    with pytest.raises(PipelineError, match=r"Documenter failed: the documenter service is busy \(rate limit reached\) \(tried 3 times\)"):
-        document(TRANSCRIPT, FakeChatClient(error, error, error), model="fake")
+    with pytest.raises(PipelineError, match=r"Documenter failed: the documenter service is busy \(rate limit reached\) \(tried 7 times\)"):
+        document(TRANSCRIPT, FakeChatClient(*[error] * 7), model="fake")
 
 
 def test_request_uses_strict_schema_and_numbered_lines() -> None:

@@ -20,7 +20,10 @@ class FakeChatClient:
     well-behaved refiner. `replies` (strings or exceptions) are returned first, in order.
     """
 
-    def __init__(self, replacements: dict[str, str] | None = None, replies: list[Any] | None = None) -> None:
+    def __init__(
+        self, replacements: dict[str, str] | None = None, replies: list[Any] | None = None, finish_reason: str = "stop"
+    ) -> None:
+        self.finish_reason = finish_reason
         self.replacements = replacements or {}
         self.replies = list(replies or [])
         self.calls: list[dict[str, Any]] = []
@@ -39,7 +42,7 @@ class FakeChatClient:
                 for wrong, right in self.replacements.items():
                     seg["text"] = seg["text"].replace(wrong, right)
             content = json.dumps({"segments": segments})
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content), finish_reason=self.finish_reason)])
 
 
 def make_transcript(*texts: str) -> Transcript:
@@ -80,6 +83,7 @@ def test_unchanged_transcript_has_no_corrections() -> None:
         ("Arjun suggested trying it.", "Arjun decided trying it.", "changed a commitment"),
         ("Honestly the new thing looks fun to try out later on.", "Kafka streams events from the queue into the warehouse.", "rewrote too much"),
         ("Some words here.", "   ", "was empty"),
+        ("Okay, so we moved on. Next item.", "Okay so we moved on Next item", "changed the punctuation"),
     ],
 )
 def test_unsafe_edits_are_rejected(original: str, bad_edit: str, reason: str) -> None:
@@ -109,14 +113,46 @@ def test_safe_edits_pass_the_checks(original: str, good_edit: str) -> None:
     assert check_edit(original, good_edit) is None
 
 
-def test_missing_segment_counts_as_bad_output_and_is_retried() -> None:
-    wrong_ids = json.dumps({"segments": [{"id": 0, "text": "First."}]})  # segment 1 missing
-    client = FakeChatClient(replies=[wrong_ids])  # second attempt uses the normal echo
+def test_segments_left_out_of_the_reply_stay_unchanged() -> None:
+    only_one = json.dumps({"segments": [{"id": 1, "text": "We use Kubernetes."}]})
+    client = FakeChatClient(replies=[only_one])
+
+    refined = refine(make_transcript("First.", "We use cooper netties.", "Third."), client, model="fake")
+
+    assert len(client.calls) == 1
+    assert [s.text for s in refined.segments] == ["First.", "We use Kubernetes.", "Third."]
+    assert [(c.before, c.after) for c in refined.corrections] == [("cooper netties.", "Kubernetes.")]
+
+
+def test_empty_reply_means_nothing_to_fix() -> None:
+    refined = refine(make_transcript("All good."), FakeChatClient(replies=['{"segments": []}']), model="fake")
+
+    assert refined.text == "All good."
+    assert refined.corrections == []
+
+
+@pytest.mark.parametrize(
+    "bad_reply",
+    [
+        json.dumps({"segments": [{"id": 7, "text": "Not a segment we sent."}]}),  # unknown id
+        json.dumps({"segments": [{"id": 0, "text": "A."}, {"id": 0, "text": "B."}]}),  # repeated id
+    ],
+)
+def test_unknown_or_repeated_ids_are_retried(bad_reply: str) -> None:
+    client = FakeChatClient(replies=[bad_reply])  # second attempt uses the normal echo
 
     refined = refine(make_transcript("First.", "Second."), client, model="fake")
 
     assert len(client.calls) == 2
     assert refined.text == "First. Second."
+
+
+def test_cut_off_reply_is_retried() -> None:
+    client = FakeChatClient(finish_reason="length")
+
+    with pytest.raises(PipelineError, match="unexpected format"):
+        refine(make_transcript("Hello."), client, model="fake")
+    assert len(client.calls) == 2
 
 
 def test_broken_json_twice_gives_clear_error() -> None:
@@ -151,9 +187,11 @@ def test_long_transcripts_are_sent_in_batches() -> None:
     transcript = make_transcript(*[f"Line {i}." for i in range(100)])
     client = FakeChatClient()
 
-    refined = refine(transcript, client, model="fake")
+    details: list[str] = []
+    refined = refine(transcript, client, model="fake", on_detail=details.append)
 
     assert len(client.calls) == 3  # 40 + 40 + 20
+    assert details == ["Batch 1 of 3", "Batch 2 of 3", "Batch 3 of 3"]
     assert len(refined.segments) == 100
     assert refined.segments[99].text == "Line 99."
     last_batch = json.loads(client.calls[2]["messages"][1]["content"])["segments"]
@@ -169,6 +207,7 @@ def test_request_settings_and_glossary() -> None:
     assert call["model"] == "fake-model"
     assert call["temperature"] == 0
     assert call["response_format"] == {"type": "json_object"}
+    assert call["reasoning_effort"] == "low"
     system_prompt = call["messages"][0]["content"]
     assert "Zephyr, KubeFlow" in system_prompt
     assert "{{GLOSSARY}}" not in system_prompt

@@ -28,8 +28,8 @@ describe('checkFile', () => {
 
   it('rejects files over the limit', () => {
     const big = audioFile('long.mp3', 1)
-    Object.defineProperty(big, 'size', { value: 26 * 1024 * 1024 })
-    expect(checkFile(big)).toMatch(/26\.0 MB, above the 25 MB limit/)
+    Object.defineProperty(big, 'size', { value: 201 * 1024 * 1024 })
+    expect(checkFile(big)).toMatch(/201\.0 MB, above the 200 MB limit/)
   })
 })
 

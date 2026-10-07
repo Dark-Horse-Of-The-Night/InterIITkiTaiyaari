@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from app.pipeline.audio import prepare_for_stt, validate_audio_file
+import app.pipeline.audio as audio_module
+from app.pipeline.audio import plan_cuts, prepare_chunks, validate_audio_file
 from app.pipeline.errors import PipelineError
 
 
@@ -66,14 +67,75 @@ def test_missing_file_is_rejected(tmp_path: Path) -> None:
         validate_audio_file(tmp_path / "nope.wav", max_upload_mb=25)
 
 
-def test_prepare_converts_to_16k_mono_flac(tmp_path: Path) -> None:
-    audio = make_tone_wav(tmp_path / "meeting.wav")
+def make_wav_with_pauses(path: Path, pattern: list[tuple[str, float]], rate: int = 16000) -> Path:
+    """A mono WAV made of ("tone", seconds) and ("silence", seconds) pieces."""
+    with wave.open(str(path), "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(rate)
+        for kind, seconds in pattern:
+            for i in range(int(seconds * rate)):
+                sample = int(8000 * math.sin(2 * math.pi * 300 * i / rate)) if kind == "tone" else 0
+                wav.writeframes(struct.pack("<h", sample))
+    return path
 
-    prepared = prepare_for_stt(audio, tmp_path)
 
-    assert prepared.suffix == ".flac"
-    probe = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "stream=sample_rate,channels", "-of", "csv=p=0", str(prepared)],
+def probe(path: Path, entries: str) -> str:
+    return subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", entries, "-of", "csv=p=0", str(path)],
         capture_output=True, text=True, check=True,
-    )
-    assert probe.stdout.strip() == "16000,1"
+    ).stdout.strip()
+
+
+def test_recording_over_the_duration_limit_is_rejected(tmp_path: Path) -> None:
+    audio = make_tone_wav(tmp_path / "long.wav", seconds=2.0)
+
+    with pytest.raises(PipelineError, match="above the 0-minute limit"):
+        validate_audio_file(audio, max_upload_mb=25, max_audio_minutes=0)
+
+
+def test_short_recording_becomes_one_mono_opus_part(tmp_path: Path) -> None:
+    audio = make_tone_wav(tmp_path / "meeting.wav")  # stereo, 44.1 kHz
+
+    chunks = prepare_chunks(audio, 1.0, tmp_path)
+
+    assert len(chunks) == 1
+    assert (chunks[0].start, chunks[0].end) == (0.0, 1.0)
+    assert chunks[0].path.suffix == ".ogg"
+    assert probe(chunks[0].path, "stream=codec_name,channels") == "opus,1"
+    assert not (tmp_path / "full_16k_mono.wav").exists()  # temporary WAV cleaned up
+
+
+def test_long_recording_is_split_at_pauses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pretend a "chunk" is 10 s (instead of 10 min) so a 25 s file stands in for a long meeting.
+    monkeypatch.setattr(audio_module, "CHUNK_SECONDS", 10)
+    monkeypatch.setattr(audio_module, "CUT_SEARCH_SECONDS", 4)
+    audio = make_wav_with_pauses(tmp_path / "long.wav", [
+        ("tone", 7.0), ("silence", 1.0),   # pause 7-8 s, just before the 10 s mark
+        ("tone", 9.0), ("silence", 1.0),   # pause 17-18 s, just before the next mark (8 + 10)
+        ("tone", 7.0),
+    ])
+
+    chunks = prepare_chunks(audio, 25.0, tmp_path)
+
+    assert [(c.start, c.end) for c in chunks] == [(0.0, pytest.approx(7.5, abs=0.15)),
+                                                  (pytest.approx(7.5, abs=0.15), pytest.approx(17.5, abs=0.15)),
+                                                  (pytest.approx(17.5, abs=0.15), 25.0)]
+    total = sum(float(probe(c.path, "format=duration")) for c in chunks)
+    assert total == pytest.approx(25.0, abs=0.3)  # nothing lost or duplicated
+
+
+def test_cut_plan_without_pauses_cuts_at_the_marks() -> None:
+    assert plan_cuts(1500, []) == [600, 1200]
+
+
+def test_cut_plan_uses_latest_pause_before_each_mark() -> None:
+    pauses = [(570, 571), (590, 592), (640, 641), (1150, 1152), (1170, 1172)]
+    # 1st cut: pauses in 570..600 -> latest middle is 591.
+    # 2nd mark: 591 + 600 = 1191, window 1161..1191 -> pause at 1171 (1151 is too early).
+    assert plan_cuts(1700, pauses) == [591, 1171]
+
+
+def test_cut_plan_merges_a_tiny_final_part() -> None:
+    assert plan_cuts(650, []) == []  # 10 min + 50 s: one part, not a 50-second leftover
+    assert plan_cuts(1250, []) == [600]  # 600 + 650

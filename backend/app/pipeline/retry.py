@@ -24,9 +24,14 @@ DOCUMENTER_TIMEOUT = 90.0  # whole record (usually 6-10 s)
 
 # --- Retries ---
 MAX_RETRIES_AFTER_TIMEOUT = 1  # we already waited a long time
-MAX_RETRIES_AFTER_QUICK_FAILURE = 2  # connection refused, server error, rate limit
+MAX_RETRIES_AFTER_QUICK_FAILURE = 2  # connection refused, server error
 RETRY_DELAYS = [2.0, 5.0]  # wait before the 1st and 2nd retry
-MAX_RETRY_AFTER_SECONDS = 20.0  # cap on a rate limit's "Retry-After" wait
+
+# Rate limits are expected on Groq's free tier (8,000 tokens per minute), especially for
+# long meetings, so we wait them out patiently instead of failing.
+MAX_RETRIES_AFTER_RATE_LIMIT = 6
+RATE_LIMIT_DEFAULT_WAIT = 10.0  # when the service doesn't say how long to wait
+MAX_RETRY_AFTER_SECONDS = 60.0  # cap on a rate limit's "Retry-After" wait
 
 # How to wait between retries. Tests replace this so they don't really wait.
 sleep: Callable[[float], None] = time.sleep
@@ -73,21 +78,32 @@ def call_with_retry(call: Callable[[], T], stage: str, on_retry: RetryCallback |
 
             retries += 1
             wait = _wait_before_retry(error, retries)
-            note = f"{reason}. Retrying (attempt {retries + 1} of {max_retries + 1})…"
+            if isinstance(error, openai.RateLimitError):
+                note = f"{reason}. Waiting {wait:.0f}s, then trying again ({retries} of {max_retries})…"
+            else:
+                note = f"{reason}. Retrying (attempt {retries + 1} of {max_retries + 1})…"
             logger.warning("%s: %s; retrying in %.0fs (attempt %d of %d)", stage, reason, wait, retries + 1, max_retries + 1)
             if on_retry:
                 on_retry(note)
             sleep(wait)
 
 
+def is_request_too_large(error: openai.APIError) -> bool:
+    """A single request bigger than the per-minute token limit. Waiting can't fix it."""
+    status = getattr(error, "status_code", None)
+    return status == 413 or (status == 429 and "request too large" in str(error).lower())
+
+
 def _temporary_problem(error: openai.APIError) -> tuple[str, int] | None:
     """(reason shown to the user, how many retries allowed), or None if not worth retrying."""
+    if is_request_too_large(error):
+        return None
     if isinstance(error, openai.APITimeoutError):  # check before APIConnectionError: it's a subclass
         return "Slow response from the service", MAX_RETRIES_AFTER_TIMEOUT
     if isinstance(error, openai.APIConnectionError):
         return "Could not connect to the service", MAX_RETRIES_AFTER_QUICK_FAILURE
     if isinstance(error, openai.RateLimitError):
-        return "The service is busy (rate limit)", MAX_RETRIES_AFTER_QUICK_FAILURE
+        return "Reached the AI service's rate limit (free tier)", MAX_RETRIES_AFTER_RATE_LIMIT
     if isinstance(error, openai.InternalServerError):  # any 5xx
         return "The service had a temporary error", MAX_RETRIES_AFTER_QUICK_FAILURE
     return None
@@ -99,5 +115,5 @@ def _wait_before_retry(error: openai.APIError, retry_number: int) -> float:
         try:
             return min(float(error.response.headers.get("retry-after", "")), MAX_RETRY_AFTER_SECONDS)
         except ValueError:
-            pass
+            return RATE_LIMIT_DEFAULT_WAIT
     return RETRY_DELAYS[min(retry_number, len(RETRY_DELAYS)) - 1]

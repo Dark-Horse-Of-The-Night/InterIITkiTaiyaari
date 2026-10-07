@@ -1,6 +1,7 @@
 """Stage 2: refine the transcript — fix misrecognised technical terms, nothing else.
 
-The LLM proposes corrected text for each segment, then code checks every edit
+The LLM returns only the segments it wants to change (anything left out stays as
+it was, so an omission can never change meaning). Code then checks every edit
 (numbers, negation, commitment words, edit size). Edits that fail a check are
 discarded and the original wording is kept, with a warning. Names cannot be fully
 checked in code (fixing "cooper netties" legitimately removes capitalised words),
@@ -11,6 +12,7 @@ import difflib
 import json
 import re
 from collections import Counter
+from collections.abc import Callable
 from typing import Any
 
 import openai
@@ -26,6 +28,9 @@ from app.prompt_loader import load_prompt
 
 BATCH_SIZE = 40  # segments per request, so long meetings don't hit output limits
 MAX_ATTEMPTS = 2  # one retry if the model returns badly formatted output
+# Fixing term spellings needs little reasoning; "low" uses far fewer tokens, which matters
+# under the free tier's 8,000-tokens-per-minute limit (measured: 2,779 -> 355 output tokens).
+REASONING_EFFORT = "low"
 
 # An edit counts as a rewrite if it changes more than this many words (or this
 # fraction of them) AND the text no longer looks similar letter by letter.
@@ -72,6 +77,7 @@ def refine(
     model: str,
     glossary: list[str] | None = None,
     on_retry: RetryCallback | None = None,
+    on_detail: Callable[[str], None] | None = None,
 ) -> RefinedTranscript:
     """Correct misrecognised terms in every segment, keeping timestamps and meaning."""
     system_prompt = build_system_prompt(glossary)
@@ -80,13 +86,16 @@ def refine(
     corrections: list[Correction] = []
     warnings: list[str] = []
 
+    batch_count = -(-len(segments) // BATCH_SIZE)  # rounded up
     for batch_start in range(0, len(segments), BATCH_SIZE):
+        if on_detail and batch_count > 1:
+            on_detail(f"Batch {batch_start // BATCH_SIZE + 1} of {batch_count}")
         batch = segments[batch_start : batch_start + BATCH_SIZE]
         ids = list(range(batch_start, batch_start + len(batch)))
         proposed = _request_batch(client, model, system_prompt, ids, batch, on_retry)
 
         for segment_id, segment in zip(ids, batch):
-            new_text = proposed[segment_id]
+            new_text = proposed.get(segment_id, segment.text)  # not returned = unchanged
             problem = check_edit(segment.text, new_text)
             if problem:
                 warnings.append(
@@ -128,11 +137,15 @@ def _request_batch(
                     ],
                     temperature=0,
                     response_format={"type": "json_object"},
+                    reasoning_effort=REASONING_EFFORT,
                 ),
                 STAGE_REFINER,
                 on_retry,
             )
-            return parse_reply(response.choices[0].message.content, ids)
+            choice = response.choices[0]
+            if choice.finish_reason == "length":
+                raise BadModelOutput("reply was cut off")
+            return parse_reply(choice.message.content, ids)
         except BadModelOutput:
             continue
         except openai.BadRequestError as error:
@@ -149,15 +162,15 @@ def _request_batch(
     )
 
 
-def parse_reply(content: str | None, expected_ids: list[int]) -> dict[int, str]:
-    """Check the reply has exactly the segment ids we sent, each with text."""
+def parse_reply(content: str | None, sent_ids: list[int]) -> dict[int, str]:
+    """Read {id: new text} for the changed segments. Every id must be one we sent, at most once."""
     try:
         data = json.loads(content or "")
         result = {int(item["id"]): str(item["text"]) for item in data["segments"]}
     except (ValueError, KeyError, TypeError) as error:
         raise BadModelOutput(str(error)) from None
-    if sorted(result) != sorted(expected_ids) or len(data["segments"]) != len(expected_ids):
-        raise BadModelOutput("segment ids do not match")
+    if not set(result) <= set(sent_ids) or len(result) != len(data["segments"]):
+        raise BadModelOutput("unknown or repeated segment ids")
     return result
 
 
@@ -171,11 +184,18 @@ def check_edit(original: str, refined: str) -> str | None:
         return "changed a negation"
     if commitment_tokens(original) != commitment_tokens(refined):
         return "changed a commitment word (such as will, should or decided)"
+    if punctuation(original) != punctuation(refined):
+        return "changed the punctuation"
     changed = count_changed_words(original, refined)
     many_words_changed = changed > max(MAX_CHANGED_WORDS, MAX_CHANGED_FRACTION * len(original.split()))
     if many_words_changed and letter_similarity(original, refined) < MIN_SIMILARITY:
         return "rewrote too much of the segment"
     return None
+
+
+def punctuation(text: str) -> Counter[str]:
+    """Sentence punctuation marks. Term fixes like "CICD" -> "CI/CD" don't touch these."""
+    return Counter(char for char in text if char in ".,?!;:")
 
 
 def number_tokens(text: str) -> Counter[str]:

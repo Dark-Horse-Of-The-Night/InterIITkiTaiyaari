@@ -51,7 +51,7 @@ def test_success_needs_no_retry(no_real_waiting: list[float]) -> None:
 
 @pytest.mark.parametrize(
     "error",
-    [connection(), status_error(openai.InternalServerError, 503), status_error(openai.RateLimitError, 429)],
+    [connection(), status_error(openai.InternalServerError, 503)],
 )
 def test_quick_failures_are_retried_up_to_twice(error: Exception, no_real_waiting: list[float]) -> None:
     notes: list[str] = []
@@ -104,10 +104,47 @@ def test_rate_limit_retry_after_is_respected_and_capped(no_real_waiting: list[fl
     call = Flaky(
         status_error(openai.RateLimitError, 429, {"retry-after": "7"}),
         status_error(openai.RateLimitError, 429, {"retry-after": "120"}),
+        status_error(openai.RateLimitError, 429),  # no header: default wait
     )
 
     call_with_retry(call, "Refiner")
-    assert no_real_waiting == [7.0, 20.0]
+    assert no_real_waiting == [7.0, 60.0, 10.0]
+
+
+def test_rate_limits_are_waited_out_patiently(no_real_waiting: list[float]) -> None:
+    notes: list[str] = []
+    rate_limit = status_error(openai.RateLimitError, 429, {"retry-after": "12"})
+    call = Flaky(*[rate_limit] * 6)
+
+    assert call_with_retry(call, "Refiner", notes.append) == "ok"
+    assert call.calls == 7
+    assert notes[0] == "Reached the AI service's rate limit (free tier). Waiting 12s, then trying again (1 of 6)…"
+
+    with pytest.raises(RetriesExhausted) as raised:
+        call_with_retry(Flaky(*[rate_limit] * 7), "Refiner")
+    assert raised.value.attempts == 7
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        status_error(openai.APIStatusError, 413),
+        openai.RateLimitError(
+            "Request too large for model on tokens per minute (TPM): Limit 8000, Requested 9500",
+            response=httpx.Response(429, request=REQUEST), body=None,
+        ),
+    ],
+)
+def test_request_too_large_is_not_retried_and_explained(error: Exception, no_real_waiting: list[float]) -> None:
+    call = Flaky(error)
+
+    with pytest.raises(type(error)) as raised:
+        call_with_retry(call, "Documenter")
+    assert call.calls == 1
+    assert no_real_waiting == []
+    message = str(explain_api_error(raised.value, "Documenter", "DOCUMENTER", "m"))  # type: ignore[arg-type]
+    assert "too long for the AI service's per-minute limit" in message
+    assert "paid Groq plan" in message
 
 
 def test_timeout_message_says_how_many_tries() -> None:

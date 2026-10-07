@@ -13,7 +13,8 @@ def test_loads_all_settings(tmp_path: Path) -> None:
     assert settings.refiner_model == "fake-refiner"
     assert settings.documenter_model == "fake-documenter"
     assert settings.stt_api_key.get_secret_value() == FAKE_KEY
-    assert settings.max_upload_mb == 25  # default when not set
+    assert settings.max_upload_mb == 200  # defaults when not set
+    assert settings.max_audio_minutes == 120
 
 
 def test_missing_key_gives_clear_error(tmp_path: Path) -> None:

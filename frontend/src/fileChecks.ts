@@ -3,7 +3,7 @@
 
 // Must match SUPPORTED_EXTENSIONS and MAX_UPLOAD_MB in the backend.
 export const SUPPORTED_EXTENSIONS = ['.flac', '.m4a', '.mp3', '.mp4', '.mpeg', '.mpga', '.ogg', '.wav', '.webm']
-export const MAX_UPLOAD_MB = 25
+export const MAX_UPLOAD_MB = 200
 
 /** Returns a message explaining what's wrong with the file, or null if it looks fine. */
 export function checkFile(file: File): string | null {

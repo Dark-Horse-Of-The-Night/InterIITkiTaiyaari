@@ -9,7 +9,7 @@ const LABELS: Record<string, string> = {
   Documenter: 'Writing the meeting record',
 }
 
-// After this long in one step, reassure the user that a slow AI service isn't a frozen app.
+// After this long without progress in a step, reassure the user that a slow AI service isn't a frozen app.
 export const SLOW_STAGE_SECONDS = 20
 
 interface Props {
@@ -42,19 +42,23 @@ export default function ProgressSteps({ stages, active }: Props) {
       </ol>
       {active && (
         <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
-          {elapsed}s elapsed · longer recordings can take a minute or two
+          {formatElapsed(elapsed)} elapsed · long recordings can take several minutes
         </p>
       )}
     </div>
   )
 }
 
-/** A retry note from the backend, or a reassurance if the step has been running a while. */
+/** Where a long step has got to ("Part 2 of 6"), plus a retry note or a reassurance if it goes quiet. */
 function StageHint({ stage }: { stage: StageProgress }) {
-  const slow = (stage.running_seconds ?? 0) > SLOW_STAGE_SECONDS
-  const text = stage.note ?? (slow ? 'Taking longer than usual. The AI service may be busy.' : null)
-  if (!text) return null
-  return <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">{text}</p>
+  const quiet = (stage.seconds_since_update ?? 0) > SLOW_STAGE_SECONDS
+  const warning = stage.note ?? (quiet ? 'Taking longer than usual. The AI service may be busy.' : null)
+  return (
+    <>
+      {stage.detail && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{stage.detail}</p>}
+      {warning && <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">{warning}</p>}
+    </>
+  )
 }
 
 function describe(stage: StageProgress): string {
@@ -82,6 +86,10 @@ function StateIcon({ state }: { state: StageState }) {
     case 'failed':
       return <span aria-hidden className={`${base} bg-red-600 text-white`}>✕</span>
   }
+}
+
+function formatElapsed(seconds: number): string {
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
 }
 
 function useElapsedSeconds(active: boolean): number {

@@ -144,8 +144,8 @@ def test_oversized_file_is_rejected_from_its_header(setup: Setup) -> None:
 )
 def test_ai_stage_failure_names_the_stage(setup: Setup, stage_client: str, error: Exception, stage: str, expected: str) -> None:
     # Repeat the error so it is still failing after the automatic retries.
-    fake = {"stt": FakeWhisperClient(error=error), "refiner": FakeRefinerClient(replies=[error] * 3),
-            "documenter": FakeDocumenterClient(*[error] * 3)}[stage_client]
+    fake = {"stt": FakeWhisperClient(error=error), "refiner": FakeRefinerClient(replies=[error] * 7),
+            "documenter": FakeDocumenterClient(*[error] * 7)}[stage_client]
     setattr(setup.clients, stage_client, fake)
 
     job_id = setup.upload(setup.wav()).json()["job_id"]
@@ -232,14 +232,23 @@ def test_retry_note_appears_during_a_stage_and_clears_when_done(setup: Setup) ->
     assert all(stage["note"] is None for stage in job["stages"])  # cleared once the stage finished
 
 
-def test_running_seconds_is_reported_only_while_running(setup: Setup) -> None:
+def test_progress_detail_and_quiet_time(setup: Setup, monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = [1000.0]
+    monkeypatch.setattr("app.jobs.time.time", lambda: clock[0])
     job = setup.jobs.create("x.mp3")
+
+    def stt() -> dict[str, Any]:
+        return setup.jobs.get(job.job_id).model_dump()["stages"][0]  # type: ignore[union-attr]
+
     setup.jobs.update_stage(job.job_id, "Speech-to-text", "running", None)
-    running = setup.jobs.get(job.job_id).model_dump()["stages"][0]  # type: ignore[union-attr]
+    clock[0] += 30
+    assert stt()["seconds_since_update"] == 30.0
+    assert "updated_at" not in stt()  # internal field stays internal
 
-    assert running["running_seconds"] is not None and running["running_seconds"] >= 0
-    assert "started_at" not in running  # internal field stays internal
+    setup.jobs.set_detail(job.job_id, "Speech-to-text", "Part 2 of 6")  # progress resets the quiet time
+    assert stt()["detail"] == "Part 2 of 6"
+    assert stt()["seconds_since_update"] == 0.0
 
-    setup.jobs.update_stage(job.job_id, "Speech-to-text", "done", 2.0)
-    done = setup.jobs.get(job.job_id).model_dump()["stages"][0]  # type: ignore[union-attr]
-    assert done["running_seconds"] is None
+    setup.jobs.update_stage(job.job_id, "Speech-to-text", "done", 40.0)
+    assert stt()["seconds_since_update"] is None
+    assert stt()["detail"] is None

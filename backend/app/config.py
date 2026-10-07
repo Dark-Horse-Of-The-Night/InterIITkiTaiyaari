@@ -40,7 +40,8 @@ class Settings(BaseSettings):
     documenter_model: str
 
     # Uploads
-    max_upload_mb: int = 25
+    max_upload_mb: int = 200
+    max_audio_minutes: int = 120
 
     @field_validator("stt_api_key", "refiner_api_key", "documenter_api_key")
     @classmethod

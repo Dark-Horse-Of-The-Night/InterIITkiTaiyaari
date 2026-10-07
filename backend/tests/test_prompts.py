@@ -7,7 +7,7 @@ def test_refiner_prompt_contains_key_rules() -> None:
     prompt = load_prompt("refiner")
 
     assert "{{GLOSSARY}}" in prompt
-    for rule in ["names", "numbers", "negation", "commitments", "same \"id\""]:
+    for rule in ["names", "numbers", "negation", "commitments", "ONLY the segments you changed"]:
         assert rule in prompt
 
 

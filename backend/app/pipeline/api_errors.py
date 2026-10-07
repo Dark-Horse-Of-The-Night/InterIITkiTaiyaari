@@ -3,7 +3,7 @@
 import openai
 
 from app.pipeline.errors import PipelineError
-from app.pipeline.retry import RetriesExhausted
+from app.pipeline.retry import RetriesExhausted, is_request_too_large
 
 
 def explain_api_error(
@@ -24,6 +24,12 @@ def explain_api_error(
         error = error.error
 
     service = f"the {stage.lower()} service"
+    if is_request_too_large(error):
+        return PipelineError(
+            stage,
+            "this meeting is too long for the AI service's per-minute limit",
+            "Try a shorter recording, or use a paid Groq plan (higher limits) for long meetings.",
+        )
     if isinstance(error, openai.AuthenticationError):
         return PipelineError(stage, "the API key was rejected", f"Check {setting_prefix}_API_KEY in backend/.env.")
     if isinstance(error, openai.RateLimitError):

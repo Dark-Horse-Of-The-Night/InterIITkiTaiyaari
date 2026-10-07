@@ -107,7 +107,7 @@ def test_transcribe_file_validates_converts_and_transcribes(tmp_path: Path) -> N
     transcript = transcribe_file(upload, client, model="m", max_upload_mb=25)
 
     assert transcript.text == "Hello."
-    assert client.calls[0]["file"].name.endswith("_16k_mono.flac")  # converted before sending
+    assert client.calls[0]["file"].name.endswith("part_01.ogg")  # converted before sending
 
 
 def test_transcribe_file_rejects_bad_upload_before_calling_api(tmp_path: Path) -> None:
@@ -118,3 +118,36 @@ def test_transcribe_file_rejects_bad_upload_before_calling_api(tmp_path: Path) -
     with pytest.raises(PipelineError, match="File check failed"):
         transcribe_file(bad, client, model="m", max_upload_mb=25)
     assert client.calls == []
+
+
+def test_long_recording_parts_become_one_continuous_transcript(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.pipeline.audio as audio_module
+    from tests.test_audio import make_wav_with_pauses
+
+    monkeypatch.setattr(audio_module, "CHUNK_SECONDS", 10)
+    monkeypatch.setattr(audio_module, "CUT_SEARCH_SECONDS", 4)
+    upload = make_wav_with_pauses(tmp_path / "long.wav", [("tone", 7.0), ("silence", 1.0), ("tone", 9.0), ("silence", 1.0), ("tone", 7.0)])
+    client = FakeWhisperClient(segments=[{"start": 1.0, "end": 2.0, "text": "Hello."}])  # same reply for every part
+    details: list[str] = []
+
+    transcript = transcribe_file(upload, client, model="m", max_upload_mb=25, on_detail=details.append)
+
+    assert len(client.calls) == 3
+    starts = [s.start for s in transcript.segments]
+    assert starts == [1.0, pytest.approx(8.5, abs=0.15), pytest.approx(18.5, abs=0.15)]  # shifted by each part's start
+    assert details == ["Preparing the audio", "Part 1 of 3", "Part 2 of 3", "Part 3 of 3"]
+
+
+def test_one_silent_part_of_a_long_recording_is_fine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.pipeline.audio as audio_module
+    from tests.test_audio import make_wav_with_pauses
+
+    monkeypatch.setattr(audio_module, "CHUNK_SECONDS", 10)
+    upload = make_wav_with_pauses(tmp_path / "long.wav", [("tone", 25.0)])
+    replies = iter([[{"start": 0, "end": 1, "text": "Hi."}], [], [{"start": 0, "end": 1, "text": "Bye."}]])
+    client = FakeWhisperClient()
+    client.audio.transcriptions.create = lambda **kw: SimpleNamespace(segments=[SimpleNamespace(**x) for x in next(replies)])
+
+    transcript = transcribe_file(upload, client, model="m", max_upload_mb=25)
+
+    assert transcript.text == "Hi. Bye."

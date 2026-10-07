@@ -107,10 +107,21 @@ describe('JobView progress', () => {
     expect(screen.getByText('Slow response from the service. Retrying (attempt 2 of 2)…')).toBeInTheDocument()
   })
 
+  it('shows where a long step has got to', async () => {
+    const job = makeJob('running', ['running', 'pending', 'pending'])
+    job.stages[0].detail = 'Part 2 of 6'
+    fakeFetch(job)
+    render(<JobView initialJob={queued} onReset={() => {}} />)
+
+    await nextPoll()
+
+    expect(screen.getByText('Part 2 of 6')).toBeInTheDocument()
+  })
+
   it('says a step is taking longer than usual after 20 seconds', async () => {
     const at = (seconds: number) => {
       const job = makeJob('running', ['done', 'running', 'pending'])
-      job.stages[1].running_seconds = seconds
+      job.stages[1].seconds_since_update = seconds
       return job
     }
     fakeFetch(at(SLOW_STAGE_SECONDS - 5), at(SLOW_STAGE_SECONDS + 1))

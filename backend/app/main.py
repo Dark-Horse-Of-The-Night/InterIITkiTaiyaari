@@ -161,7 +161,7 @@ def create_meeting(
         if not save_upload(file, audio_path, settings.max_upload_mb):
             shutil.rmtree(work_dir, ignore_errors=True)
             return too_large_response(settings.max_upload_mb)
-        validate_audio_file(audio_path, settings.max_upload_mb)  # quick: format, empty, readable
+        validate_audio_file(audio_path, settings.max_upload_mb, settings.max_audio_minutes)  # quick checks
     except Exception:
         shutil.rmtree(work_dir, ignore_errors=True)
         raise
@@ -198,6 +198,7 @@ def process_meeting(
             audio_path, settings, clients, glossary,
             on_progress=lambda stage, state, seconds: jobs.update_stage(job_id, stage, state, seconds),
             on_note=lambda stage, note: jobs.set_note(job_id, stage, note),
+            on_detail=lambda stage, detail: jobs.set_detail(job_id, stage, detail),
         )
         jobs.finish(job_id, result)
     except PipelineError as error:

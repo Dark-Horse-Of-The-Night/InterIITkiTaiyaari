@@ -43,6 +43,7 @@ def main() -> int:
         result = run_pipeline(
             args.file, settings, PipelineClients.from_settings(settings), glossary, print_progress,
             on_note=lambda stage, note: print(f"{stage}: {note}"),
+            on_detail=lambda stage, detail: print(f"{stage}: {detail}"),
         )
     except (ConfigError, PipelineError) as error:
         print(f"Error: {error}")

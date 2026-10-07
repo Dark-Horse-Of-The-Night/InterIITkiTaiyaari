@@ -11,7 +11,7 @@ export function makeJob(status: Job['status'], states: StageState[], overrides: 
     job_id: 'job-1',
     filename: 'meeting.mp3',
     status,
-    stages: STAGE_NAMES.map((name, i) => ({ name, state: states[i], seconds: states[i] === 'done' ? 2.5 : null, note: null, running_seconds: null })),
+    stages: STAGE_NAMES.map((name, i) => ({ name, state: states[i], seconds: states[i] === 'done' ? 2.5 : null, note: null, detail: null, seconds_since_update: null })),
     result: null,
     error: null,
     ...overrides,

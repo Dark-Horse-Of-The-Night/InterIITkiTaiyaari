@@ -1,6 +1,7 @@
 """Stage 1: speech-to-text with Whisper through an OpenAI-compatible API (Groq by default)."""
 
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -9,10 +10,13 @@ from openai import OpenAI
 
 from app.config import Settings
 from app.pipeline.api_errors import explain_api_error
-from app.pipeline.audio import prepare_for_stt, validate_audio_file
+from app.pipeline.audio import prepare_chunks, validate_audio_file
 from app.pipeline.errors import STAGE_STT, PipelineError
 from app.pipeline.models import Segment, Transcript
 from app.pipeline.retry import RetriesExhausted, RetryCallback, call_with_retry, llm_timeout, stt_timeout
+
+# Called with progress details like "Part 2 of 6".
+DetailCallback = Callable[[str], None]
 
 
 def make_stt_client(settings: Settings) -> OpenAI:
@@ -26,21 +30,50 @@ def make_stt_client(settings: Settings) -> OpenAI:
 
 
 def transcribe_file(
-    upload_path: Path, client: Any, model: str, max_upload_mb: int, on_retry: RetryCallback | None = None
+    upload_path: Path,
+    client: Any,
+    model: str,
+    max_upload_mb: int,
+    on_retry: RetryCallback | None = None,
+    max_audio_minutes: int | None = None,
+    on_detail: DetailCallback | None = None,
 ) -> Transcript:
-    """Full stage 1: check the upload, convert it, and transcribe it."""
-    duration = validate_audio_file(upload_path, max_upload_mb)
+    """Full stage 1: check the upload, convert and split it, and transcribe each part in order."""
+    duration = validate_audio_file(upload_path, max_upload_mb, max_audio_minutes)
     with tempfile.TemporaryDirectory() as work_dir:
-        prepared_path = prepare_for_stt(upload_path, Path(work_dir))
-        return transcribe(prepared_path, client, model, duration, on_retry)
+        if on_detail:
+            on_detail("Preparing the audio")
+        chunks = prepare_chunks(upload_path, duration, Path(work_dir))
+        segments: list[Segment] = []
+        for number, chunk in enumerate(chunks, start=1):
+            if on_detail and len(chunks) > 1:
+                on_detail(f"Part {number} of {len(chunks)}")
+            part = transcribe(chunk.path, client, model, chunk.end - chunk.start, on_retry, allow_silence=len(chunks) > 1)
+            # Shift the part's timestamps so they count from the start of the whole recording.
+            segments += [
+                Segment(start=s.start + chunk.start, end=s.end + chunk.start, text=s.text) for s in part.segments
+            ]
+    if not segments:
+        raise PipelineError(
+            STAGE_STT,
+            "no speech was detected in the recording",
+            "Check that the recording contains people talking and is not silent.",
+        )
+    return Transcript(segments=segments)
 
 
 def transcribe(
-    audio_path: Path, client: Any, model: str, audio_seconds: float = 0, on_retry: RetryCallback | None = None
+    audio_path: Path,
+    client: Any,
+    model: str,
+    audio_seconds: float = 0,
+    on_retry: RetryCallback | None = None,
+    allow_silence: bool = False,
 ) -> Transcript:
     """Send audio to Whisper and return timestamped segments.
 
-    `client` is an OpenAI client (or a fake one in tests).
+    `client` is an OpenAI client (or a fake one in tests). `allow_silence` lets one
+    silent part of a long recording through (the whole recording is checked instead).
     """
 
     def send() -> Any:
@@ -68,7 +101,7 @@ def transcribe(
         for seg in (getattr(response, "segments", None) or [])
         if seg.text and seg.text.strip()
     ]
-    if not segments:
+    if not segments and not allow_silence:
         raise PipelineError(
             STAGE_STT,
             "no speech was detected in the recording",

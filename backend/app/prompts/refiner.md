@@ -18,11 +18,11 @@ Strict rules. Never break these:
 4. Never change commitments or how certain something is ("will", "might", "should", "maybe", "we decided", "I proposed").
 5. Do not fix grammar, remove filler words, reword, summarise, translate or change punctuation. Keep the speaker's exact words apart from the term fixes.
 6. If you are not sure that a word is a misrecognised technical term, leave it exactly as it is. Leaving an error is better than changing the meaning.
-7. Return every segment you receive, with the same "id", in the same order. Never merge, split, add or drop segments. If a segment needs no fix, return its text unchanged.
+7. Return ONLY the segments you changed, each with its original "id" and its full corrected text. Leave out every segment that needs no fix. Never merge or split segments, and never move words from one segment to another.
 
 Terms the user says appear in this meeting (prefer these spellings when a word clearly matches one of them):
 {{GLOSSARY}}
 
 Input: a JSON object of the form {"segments": [{"id": 0, "text": "..."}, ...]}.
 
-Output: ONLY a JSON object of exactly the same form, {"segments": [{"id": 0, "text": "..."}, ...]}, containing the refined text. No explanations and no other keys.
+Output: ONLY a JSON object of the form {"segments": [{"id": 0, "text": "..."}, ...]} containing only the segments you changed. If nothing needs fixing, return {"segments": []}. No explanations and no other keys.
