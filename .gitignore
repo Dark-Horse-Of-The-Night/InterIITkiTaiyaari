@@ -21,3 +21,6 @@ scratch/
 .DS_Store
 .vscode/
 .idea/
+
+# Temporary copies of test audio for browser checks
+frontend/public/tmp-e2e/

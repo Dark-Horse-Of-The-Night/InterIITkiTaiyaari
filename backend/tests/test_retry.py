@@ -100,10 +100,10 @@ def test_permanent_errors_are_not_retried(error: Exception, no_real_waiting: lis
     assert no_real_waiting == []
 
 
-def test_rate_limit_retry_after_is_respected_and_capped(no_real_waiting: list[float]) -> None:
+def test_rate_limit_retry_after_is_respected(no_real_waiting: list[float]) -> None:
     call = Flaky(
         status_error(openai.RateLimitError, 429, {"retry-after": "7"}),
-        status_error(openai.RateLimitError, 429, {"retry-after": "120"}),
+        status_error(openai.RateLimitError, 429, {"retry-after": "60"}),  # longest wait we still retry
         status_error(openai.RateLimitError, 429),  # no header: default wait
     )
 
@@ -190,3 +190,23 @@ def test_sdk_clients_have_their_own_retries_turned_off(tmp_path: Any) -> None:
         assert client.timeout.connect == 10.0
     assert make_refiner_client(settings).timeout.read == 60.0
     assert make_documenter_client(settings).timeout.read == 90.0
+
+
+def test_daily_limit_is_not_retried_and_says_when_to_try_again(no_real_waiting: list[float]) -> None:
+    daily = openai.RateLimitError(
+        "Rate limit reached for model `openai/gpt-oss-120b` on tokens per day (TPD): Limit 200000, Used 197464, "
+        "Requested 6584. Please try again in 29m8.736s.",
+        response=httpx.Response(429, request=REQUEST, headers={"retry-after": "1749"}), body=None,
+    )
+    call = Flaky(daily)
+
+    with pytest.raises(openai.RateLimitError) as raised:
+        call_with_retry(call, "Documenter")
+    assert call.calls == 1  # no pointless retries
+    assert no_real_waiting == []
+    message = str(explain_api_error(raised.value, "Documenter", "DOCUMENTER", "openai/gpt-oss-120b"))
+    assert message == (
+        "Documenter failed: the AI service's daily usage limit for model 'openai/gpt-oss-120b' has been reached. "
+        "Try again in about 29 minutes, set DOCUMENTER_MODEL in backend/.env to another model "
+        "(each model has its own limit), or use a paid Groq plan."
+    )

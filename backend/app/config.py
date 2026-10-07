@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     documenter_base_url: str
     documenter_api_key: SecretStr
     documenter_model: str
+    # Keep each documenter request under the service's per-minute token limit (Groq free tier: 8,000).
+    # Long meetings are documented in parts to stay under it. Raise it on a paid plan.
+    documenter_max_request_tokens: int = 7500
 
     # Uploads
     max_upload_mb: int = 200

@@ -5,17 +5,18 @@ The transcript as numbered lines: `[id] (mm:ss) text`. The transcript has no spe
 
 ## What to produce
 - **summary**: 2–5 sentences on what the meeting covered and concluded.
-- **minutes**: the discussion grouped by topic, in the order discussed. Each topic has a short title, a few concise points, and the ids of the lines it covers. Write the points as short summaries in your own words (what was raised, said or concluded), not copies of transcript lines. Skip greetings, small talk and sign-offs; they are not topics.
+- **minutes**: the discussion grouped by topic, in the order discussed. Use a handful of broad topics (usually 3–8), merging small related items into one topic rather than giving each sentence its own topic. Each topic has a short title, at most 4 short points, and the ids of the lines it covers. Write the points as short summaries in your own words (what was raised, said or concluded), not copies of transcript lines. Skip greetings, small talk and sign-offs; they are not topics.
 - **decisions**: things the group clearly agreed on or concluded.
 - **action_items**: tasks someone committed to, or tasks the group agreed must be done.
 - **open_items**: proposals and questions that were raised but NOT agreed or answered.
 
 ## Classification rules. Follow them exactly.
 1. A **decision** needs clear agreement or a conclusion: "we decided", "we'll go with", "agreed", "let's do that" in reply to a proposal, or a clearly settled outcome.
-2. A **proposal is not a decision.** "X proposed…", "we could…", "maybe we should…", "what if we…" go in open_items with kind "proposal", unless the meeting later clearly accepts them. If accepted later, record it as a decision and do NOT also list it as an open item.
-3. **An unaccepted suggestion is not a task.** Only list an action item if someone committed to it ("I'll…", "Priya will…") or the group agreed it must be done ("someone needs to update the docs", even if nobody volunteered).
-4. If someone changes their mind or a decision is reversed, record only the final outcome.
-5. A question that was not answered goes in open_items with kind "question".
+2. **Postponing is not deciding.** "We agreed to think about it", "let's revisit later", "not decide today" or "park that for now" means nothing was decided: keep the proposal in open_items and do NOT record a decision about postponing it.
+3. A **proposal is not a decision.** "X proposed…", "we could…", "maybe we should…", "what if we…" go in open_items with kind "proposal", unless the meeting later clearly accepts them. If accepted later, record it as a decision and do NOT also list it as an open item.
+4. **An unaccepted suggestion is not a task.** Only list an action item if someone committed to it ("I'll…", "Priya will…") or the group agreed it must be done ("someone needs to update the docs", even if nobody volunteered).
+5. If someone changes their mind or a decision is reversed, record only the final outcome.
+6. A question that was not answered goes in open_items with kind "question".
 
 ## Owners and deadlines. Never invent them.
 - **owner**: a person's name or a named team, exactly as stated in the transcript for that task. If the transcript does not name who will do it, the owner is null. "I'll do it", "we will", "someone" and "nobody" all mean null, because you don't know who "I" or "we" is.

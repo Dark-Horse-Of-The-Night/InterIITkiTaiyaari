@@ -4,24 +4,27 @@ The model must back every decision, action item and open item with an exact quot
 Code then checks the record against the transcript:
 - items whose quote isn't in the transcript are removed (likely invented);
 - owners and deadlines not stated near the quote are set to None ("Unspecified").
+
+Long meetings don't fit in one request under the free tier's per-minute token limit,
+so they are documented in parts and combined (see merge.py). The checks above run
+on the combined record against the whole transcript.
 """
 
+import math
 import re
+from collections.abc import Callable
 from typing import Any
 
-import openai
 from openai import OpenAI
-from pydantic import ValidationError
 
 from app.config import Settings
-from app.pipeline.api_errors import explain_api_error
 from app.pipeline.errors import STAGE_DOCUMENTER, PipelineError
+from app.pipeline.llm_json import ReplyCutOff, estimate_tokens, only_required, request_structured
+from app.pipeline.merge import merge_parts
 from app.pipeline.models import Evidence, MeetingRecord, Segment, Transcript
 from app.pipeline.render import format_time
-from app.pipeline.retry import DOCUMENTER_TIMEOUT, RetriesExhausted, RetryCallback, call_with_retry, llm_timeout
+from app.pipeline.retry import DOCUMENTER_TIMEOUT, RetryCallback, llm_timeout
 from app.prompt_loader import load_prompt
-
-MAX_ATTEMPTS = 2  # one retry if the model returns output that doesn't match the schema
 
 # Owners/deadlines may be stated a little before the quote ("Priya said... so she will..."),
 # so we also look this many segments before and after the cited ones.
@@ -31,6 +34,12 @@ CONTEXT_AFTER = 1
 # "Owners" that don't identify anyone. The transcript has no speaker labels.
 NOT_A_NAME = {"i", "me", "we", "us", "you", "he", "she", "they", "them", "someone", "somebody",
               "anyone", "anybody", "nobody", "everyone", "everybody", "unspecified", "unknown", "tbd"}
+
+# Half of each request's token budget is kept for the reply (the record plus the model's reasoning).
+OUTPUT_SHARE = 0.5
+MAX_OUTPUT_TOKENS = 8000
+# If a part's reply is cut off, it is split in half and retried, down to this many segments.
+MIN_PART_SEGMENTS = 8
 
 
 def make_documenter_client(settings: Settings) -> OpenAI:
@@ -43,71 +52,108 @@ def make_documenter_client(settings: Settings) -> OpenAI:
     )
 
 
-def document(transcript: Transcript, client: Any, model: str, on_retry: RetryCallback | None = None) -> MeetingRecord:
-    """Generate the meeting record, then check it against the transcript."""
-    draft = _request_record(client, model, format_transcript(transcript), on_retry)
-    return verify_record(draft, transcript.segments)
+def document(
+    transcript: Transcript,
+    client: Any,
+    model: str,
+    on_retry: RetryCallback | None = None,
+    on_detail: Callable[[str], None] | None = None,
+    max_request_tokens: int = 7500,
+) -> MeetingRecord:
+    """Generate the meeting record (in parts if the meeting is long), then check it against the transcript.
+
+    `max_request_tokens` keeps each request under the service's per-minute token limit
+    (Groq free tier: 8,000). Raise DOCUMENTER_MAX_REQUEST_TOKENS on a paid plan to use one request.
+    """
+    segments = transcript.segments
+    max_output = min(MAX_OUTPUT_TOKENS, int(max_request_tokens * OUTPUT_SHARE))
+    part_header_room = 100
+    room_for_transcript = (
+        max_request_tokens - max_output - part_header_room
+        - estimate_tokens(load_prompt("documenter") + str(record_json_schema()))
+    )
+    if room_for_transcript < 200:
+        raise PipelineError(
+            STAGE_DOCUMENTER,
+            f"DOCUMENTER_MAX_REQUEST_TOKENS ({max_request_tokens}) is too small to document anything",
+            "Set it to at least 7500 in backend/.env.",
+        )
+
+    to_do = split_into_parts(segments, room_for_transcript)
+    records: list[MeetingRecord] = []
+    while to_do:
+        first, end = to_do.pop(0)
+        total = len(records) + 1 + len(to_do)
+        if on_detail and total > 1:
+            on_detail(f"Part {len(records) + 1} of {total}")
+        header = "" if total == 1 else (
+            f"This transcript is part {len(records) + 1} of {total} of one meeting (lines [{first}] to [{end - 1}]). "
+            "Document only what happens in this part; the other parts are documented separately and "
+            "combined afterwards.\n\n"
+        )
+        try:
+            records.append(_request_record(client, model, header + format_lines(segments, first, end), max_output, on_retry))
+        except ReplyCutOff:
+            if end - first < 2 * MIN_PART_SEGMENTS:
+                raise PipelineError(
+                    STAGE_DOCUMENTER,
+                    "the model's reply was too long for the output limit, even for a small part of the meeting",
+                    "Try again, or raise DOCUMENTER_MAX_REQUEST_TOKENS if you are on a paid plan.",
+                ) from None
+            middle = (first + end) // 2
+            to_do[0:0] = [(first, middle), (middle, end)]  # document the two halves instead
+
+    if len(records) == 1:
+        draft = records[0]
+    else:
+        if on_detail:
+            on_detail("Cross-checking the parts")
+        draft = merge_parts(records, client, model, max_request_tokens, on_retry)
+    return verify_record(draft, segments)
+
+
+def split_into_parts(segments: list[Segment], max_tokens: int) -> list[tuple[int, int]]:
+    """Split segment indexes into (first, end) ranges of similar size, each fitting in `max_tokens`."""
+    sizes = [estimate_tokens(format_line(i, segment)) + 1 for i, segment in enumerate(segments)]
+    part_count = max(1, math.ceil(sum(sizes) / max_tokens))
+    target = sum(sizes) / part_count  # aim for equal parts rather than a tiny last one
+
+    parts: list[tuple[int, int]] = []
+    first, size = 0, 0
+    for i, line_size in enumerate(sizes):
+        if i > first and (size + line_size > max_tokens or (size >= target and len(parts) < part_count - 1)):
+            parts.append((first, i))
+            first, size = i, 0
+        size += line_size
+    parts.append((first, len(segments)))
+    return parts
 
 
 def format_transcript(transcript: Transcript) -> str:
     """Numbered lines for the prompt: "[3] (00:13) Arjun proposed..."."""
-    return "\n".join(
-        f"[{i}] ({format_time(seg.start)}) {seg.text}" for i, seg in enumerate(transcript.segments)
-    )
+    return format_lines(transcript.segments, 0, len(transcript.segments))
+
+
+def format_lines(segments: list[Segment], first: int, end: int) -> str:
+    """Lines first..end-1, numbered with their position in the WHOLE transcript (so evidence ids stay valid)."""
+    return "\n".join(format_line(i, segments[i]) for i in range(first, end))
+
+
+def format_line(index: int, segment: Segment) -> str:
+    return f"[{index}] ({format_time(segment.start)}) {segment.text}"
 
 
 def record_json_schema() -> dict[str, Any]:
     """The JSON schema the model must follow. Fields with defaults are filled by code, so left out."""
-    return _only_required(MeetingRecord.model_json_schema())
+    return only_required(MeetingRecord.model_json_schema())
 
 
-def _only_required(schema: Any) -> Any:
-    """Recursively drop optional properties (strict structured output needs every property required)."""
-    if isinstance(schema, dict):
-        cleaned = {key: _only_required(value) for key, value in schema.items()}
-        if "properties" in cleaned:
-            required = cleaned.get("required", [])
-            cleaned["properties"] = {k: v for k, v in cleaned["properties"].items() if k in required}
-        return cleaned
-    if isinstance(schema, list):
-        return [_only_required(item) for item in schema]
-    return schema
-
-
-def _request_record(client: Any, model: str, transcript_text: str, on_retry: RetryCallback | None) -> MeetingRecord:
-    """Ask the model for the record, retrying once if the output doesn't match the schema."""
-    for _ in range(MAX_ATTEMPTS):
-        try:
-            response = call_with_retry(
-                lambda: client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": load_prompt("documenter")},
-                        {"role": "user", "content": transcript_text},
-                    ],
-                    temperature=0,
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {"name": "meeting_record", "strict": True, "schema": record_json_schema()},
-                    },
-                ),
-                STAGE_DOCUMENTER,
-                on_retry,
-            )
-            return MeetingRecord.model_validate_json(response.choices[0].message.content or "")
-        except ValidationError:
-            continue
-        except openai.BadRequestError as error:
-            if error.code == "json_validate_failed":  # Groq: the model's output broke the schema
-                continue
-            raise explain_api_error(error, STAGE_DOCUMENTER, "DOCUMENTER", model) from None
-        except (openai.APIError, RetriesExhausted) as error:
-            raise explain_api_error(error, STAGE_DOCUMENTER, "DOCUMENTER", model) from None
-
-    raise PipelineError(
-        STAGE_DOCUMENTER,
-        "the model returned a record in an unexpected format twice in a row",
-        "Try again. If it keeps happening, try a different DOCUMENTER_MODEL in backend/.env.",
+def _request_record(
+    client: Any, model: str, transcript_text: str, max_output: int, on_retry: RetryCallback | None
+) -> MeetingRecord:
+    return request_structured(
+        client, model, load_prompt("documenter"), transcript_text, "meeting_record", record_json_schema(),
+        MeetingRecord.model_validate_json, STAGE_DOCUMENTER, "DOCUMENTER", max_output, on_retry, what="a record",
     )
 
 

@@ -126,16 +126,16 @@ def test_long_recording_is_split_at_pauses(tmp_path: Path, monkeypatch: pytest.M
 
 
 def test_cut_plan_without_pauses_cuts_at_the_marks() -> None:
-    assert plan_cuts(1500, []) == [600, 1200]
+    assert plan_cuts(1500, [], chunk_seconds=600, search_seconds=30) == [600, 1200]
 
 
 def test_cut_plan_uses_latest_pause_before_each_mark() -> None:
     pauses = [(570, 571), (590, 592), (640, 641), (1150, 1152), (1170, 1172)]
     # 1st cut: pauses in 570..600 -> latest middle is 591.
     # 2nd mark: 591 + 600 = 1191, window 1161..1191 -> pause at 1171 (1151 is too early).
-    assert plan_cuts(1700, pauses) == [591, 1171]
+    assert plan_cuts(1700, pauses, chunk_seconds=600, search_seconds=30) == [591, 1171]
 
 
 def test_cut_plan_merges_a_tiny_final_part() -> None:
-    assert plan_cuts(650, []) == []  # 10 min + 50 s: one part, not a 50-second leftover
-    assert plan_cuts(1250, []) == [600]  # 600 + 650
+    assert plan_cuts(650, [], chunk_seconds=600) == []  # 10 min + 50 s: one part, not a 50-second leftover
+    assert plan_cuts(1250, [], chunk_seconds=600) == [600]  # 600 + 650

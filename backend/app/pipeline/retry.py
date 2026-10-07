@@ -88,6 +88,18 @@ def call_with_retry(call: Callable[[], T], stage: str, on_retry: RetryCallback |
             sleep(wait)
 
 
+def long_wait_seconds(error: openai.APIError) -> float | None:
+    """For a rate limit that asks us to wait longer than we're willing to (e.g. the daily token
+    limit, which says "try again in 29m"), return that wait in seconds. Otherwise None."""
+    if not isinstance(error, openai.RateLimitError):
+        return None
+    try:
+        wait = float(error.response.headers.get("retry-after", ""))
+    except ValueError:
+        return None
+    return wait if wait > MAX_RETRY_AFTER_SECONDS else None
+
+
 def is_request_too_large(error: openai.APIError) -> bool:
     """A single request bigger than the per-minute token limit. Waiting can't fix it."""
     status = getattr(error, "status_code", None)
@@ -96,8 +108,8 @@ def is_request_too_large(error: openai.APIError) -> bool:
 
 def _temporary_problem(error: openai.APIError) -> tuple[str, int] | None:
     """(reason shown to the user, how many retries allowed), or None if not worth retrying."""
-    if is_request_too_large(error):
-        return None
+    if is_request_too_large(error) or long_wait_seconds(error) is not None:
+        return None  # waiting a minute can't fix these
     if isinstance(error, openai.APITimeoutError):  # check before APIConnectionError: it's a subclass
         return "Slow response from the service", MAX_RETRIES_AFTER_TIMEOUT
     if isinstance(error, openai.APIConnectionError):

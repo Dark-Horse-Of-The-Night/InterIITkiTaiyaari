@@ -103,7 +103,10 @@ def run_pipeline(
     )
     record = run_stage(
         STAGE_DOCUMENTER,
-        lambda: document(refined, clients.documenter, settings.documenter_model, notes_for(STAGE_DOCUMENTER)),
+        lambda: document(
+            refined, clients.documenter, settings.documenter_model, notes_for(STAGE_DOCUMENTER),
+            details_for(STAGE_DOCUMENTER), settings.documenter_max_request_tokens,
+        ),
     )
 
     return MeetingResult(

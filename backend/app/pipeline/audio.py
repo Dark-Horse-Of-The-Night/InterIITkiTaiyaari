@@ -1,7 +1,9 @@
 """Check uploaded audio files, then convert and split them for Whisper.
 
-Long recordings are split into ~10-minute parts, cut at a pause in speech so no
-word is cut in half. Each part is sent to Whisper separately.
+Long recordings are split into ~5-minute parts, cut at a pause in speech so no
+word is cut in half. Each part is sent to Whisper separately: smaller uploads
+are faster and much less likely to be dropped on a slow connection, and a retry
+only re-sends one small part.
 
 Uses ffprobe/ffmpeg (installed with `brew install ffmpeg`) through subprocess.
 """
@@ -28,8 +30,8 @@ BYTES_PER_MB = 1024 * 1024
 OPUS_BITRATE = "32k"
 
 # Splitting long recordings.
-CHUNK_SECONDS = 600  # aim for ~10-minute parts
-CUT_SEARCH_SECONDS = 30  # look for a pause in the last 30 s before each 10-minute mark
+CHUNK_SECONDS = 300  # aim for ~5-minute parts (~1.1 MB each)
+CUT_SEARCH_SECONDS = 20  # look for a pause in the last 20 s before each 5-minute mark
 SILENCE_NOISE_DB = -35  # quieter than this counts as a pause...
 SILENCE_MIN_SECONDS = 0.2  # ...if it lasts at least this long (pauses between sentences are often 0.2-0.5 s)
 
@@ -111,7 +113,7 @@ def probe_audio_duration(path: Path) -> float | None:
 
 
 def prepare_chunks(path: Path, duration: float, output_dir: Path) -> list[AudioChunk]:
-    """Convert the recording and split it into parts of about 10 minutes (one part if it's short)."""
+    """Convert the recording and split it into parts of about 5 minutes (one part if it's short)."""
     wav_path = output_dir / "full_16k_mono.wav"
     _convert(["-i", str(path), "-vn", "-ac", "1", "-ar", "16000", "-sample_fmt", "s16", str(wav_path)])
 
@@ -137,7 +139,7 @@ def plan_cuts(
     chunk_seconds: float = CHUNK_SECONDS,
     search_seconds: float = CUT_SEARCH_SECONDS,
 ) -> list[float]:
-    """Where to cut, in seconds. Prefers the middle of the latest pause before each 10-minute mark.
+    """Where to cut, in seconds. Prefers the middle of the latest pause before each chunk-length mark.
 
     A final part shorter than 10% of a chunk is merged into the previous part instead.
     """
@@ -177,7 +179,7 @@ def _convert(arguments: list[str]) -> None:
 
 def _check_part_size(chunk_path: Path) -> None:
     size = chunk_path.stat().st_size
-    if size > API_FILE_LIMIT_MB * BYTES_PER_MB:  # shouldn't happen: a 10-minute part is ~2.5 MB
+    if size > API_FILE_LIMIT_MB * BYTES_PER_MB:  # shouldn't happen: a 5-minute part is ~1.1 MB
         raise PipelineError(
             STAGE_STT,
             f"a part of the recording is too large to send ({size / BYTES_PER_MB:.0f} MB; the limit is {API_FILE_LIMIT_MB} MB)",

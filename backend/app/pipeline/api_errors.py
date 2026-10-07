@@ -3,7 +3,7 @@
 import openai
 
 from app.pipeline.errors import PipelineError
-from app.pipeline.retry import RetriesExhausted, is_request_too_large
+from app.pipeline.retry import RetriesExhausted, is_request_too_large, long_wait_seconds
 
 
 def explain_api_error(
@@ -30,6 +30,16 @@ def explain_api_error(
             "this meeting is too long for the AI service's per-minute limit",
             "Try a shorter recording, or use a paid Groq plan (higher limits) for long meetings.",
         )
+    wait = long_wait_seconds(error)
+    if wait is not None:
+        daily = "per day" in str(error).lower()
+        limit = "daily usage limit" if daily else "usage limit"
+        return PipelineError(
+            stage,
+            f"the AI service's {limit} for model '{model}' has been reached",
+            f"Try again in about {_describe_wait(wait)}, set {setting_prefix}_MODEL in backend/.env to another model "
+            "(each model has its own limit), or use a paid Groq plan.",
+        )
     if isinstance(error, openai.AuthenticationError):
         return PipelineError(stage, "the API key was rejected", f"Check {setting_prefix}_API_KEY in backend/.env.")
     if isinstance(error, openai.RateLimitError):
@@ -49,3 +59,12 @@ def explain_api_error(
             f"Check your internet connection and {setting_prefix}_BASE_URL, then try again.",
         )
     return PipelineError(stage, f"{service} returned an unexpected error{tried}", "Wait a moment and try again.")
+
+
+def _describe_wait(seconds: float) -> str:
+    minutes = round(seconds / 60)
+    if minutes < 2:
+        return "a minute"
+    if minutes < 90:
+        return f"{minutes} minutes"
+    return f"{round(minutes / 60)} hours"
