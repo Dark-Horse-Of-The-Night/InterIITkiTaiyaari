@@ -40,7 +40,10 @@ def main() -> int:
 
     try:
         settings = load_settings()
-        result = run_pipeline(args.file, settings, PipelineClients.from_settings(settings), glossary, print_progress)
+        result = run_pipeline(
+            args.file, settings, PipelineClients.from_settings(settings), glossary, print_progress,
+            on_note=lambda stage, note: print(f"{stage}: {note}"),
+        )
     except (ConfigError, PipelineError) as error:
         print(f"Error: {error}")
         return 1

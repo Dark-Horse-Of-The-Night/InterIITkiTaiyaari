@@ -24,6 +24,8 @@ STAGES = [STAGE_STT, STAGE_REFINER, STAGE_DOCUMENTER]
 
 # Called as on_progress(stage, "running", None) and on_progress(stage, "done", seconds).
 ProgressCallback = Callable[[str, Literal["running", "done"], float | None], None]
+# Called as on_note(stage, "Slow response from the service. Retrying (attempt 2 of 2)…").
+NoteCallback = Callable[[str, str], None]
 
 T = TypeVar("T")
 
@@ -62,9 +64,13 @@ def run_pipeline(
     clients: PipelineClients,
     glossary: list[str] | None = None,
     on_progress: ProgressCallback | None = None,
+    on_note: NoteCallback | None = None,
 ) -> MeetingResult:
     """Run all three stages on one audio file. Raises PipelineError if a stage fails."""
     timings: dict[str, float] = {}
+
+    def notes_for(stage: str) -> Callable[[str], None] | None:
+        return (lambda note: on_note(stage, note)) if on_note else None
 
     def run_stage(stage: str, work: Callable[[], T]) -> T:
         if on_progress:
@@ -78,10 +84,17 @@ def run_pipeline(
 
     raw = run_stage(
         STAGE_STT,
-        lambda: transcribe_file(audio_path, clients.stt, settings.stt_model, settings.max_upload_mb),
+        lambda: transcribe_file(
+            audio_path, clients.stt, settings.stt_model, settings.max_upload_mb, notes_for(STAGE_STT)
+        ),
     )
-    refined = run_stage(STAGE_REFINER, lambda: refine(raw, clients.refiner, settings.refiner_model, glossary))
-    record = run_stage(STAGE_DOCUMENTER, lambda: document(refined, clients.documenter, settings.documenter_model))
+    refined = run_stage(
+        STAGE_REFINER, lambda: refine(raw, clients.refiner, settings.refiner_model, glossary, notes_for(STAGE_REFINER))
+    )
+    record = run_stage(
+        STAGE_DOCUMENTER,
+        lambda: document(refined, clients.documenter, settings.documenter_model, notes_for(STAGE_DOCUMENTER)),
+    )
 
     return MeetingResult(
         raw_transcript=raw,

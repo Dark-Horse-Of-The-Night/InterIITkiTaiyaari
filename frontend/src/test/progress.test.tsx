@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import JobView from '../components/JobView'
+import { SLOW_STAGE_SECONDS } from '../components/ProgressSteps'
 import { POLL_INTERVAL_MS } from '../useJobPolling'
 import { errorResponse, fakeFetch, makeJob, makeResult } from './fixtures'
 
@@ -93,5 +94,33 @@ describe('JobView progress', () => {
     await nextPoll()
 
     expect(screen.getByRole('alert')).toHaveTextContent("Can't reach the server.")
+  })
+
+  it('shows a retry note under the running step', async () => {
+    const job = makeJob('running', ['running', 'pending', 'pending'])
+    job.stages[0].note = 'Slow response from the service. Retrying (attempt 2 of 2)…'
+    fakeFetch(job)
+    render(<JobView initialJob={queued} onReset={() => {}} />)
+
+    await nextPoll()
+
+    expect(screen.getByText('Slow response from the service. Retrying (attempt 2 of 2)…')).toBeInTheDocument()
+  })
+
+  it('says a step is taking longer than usual after 20 seconds', async () => {
+    const at = (seconds: number) => {
+      const job = makeJob('running', ['done', 'running', 'pending'])
+      job.stages[1].running_seconds = seconds
+      return job
+    }
+    fakeFetch(at(SLOW_STAGE_SECONDS - 5), at(SLOW_STAGE_SECONDS + 1))
+    render(<JobView initialJob={queued} onReset={() => {}} />)
+    const hint = /Taking longer than usual/
+
+    await nextPoll()
+    expect(screen.queryByText(hint)).not.toBeInTheDocument()
+
+    await nextPoll()
+    expect(screen.getByText(hint)).toBeInTheDocument()
   })
 })

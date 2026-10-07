@@ -77,6 +77,8 @@ export interface StageProgress {
   name: string
   state: StageState
   seconds: number | null
+  note: string | null // e.g. "Slow response from the service. Retrying (attempt 2 of 2)…"
+  running_seconds: number | null // how long it has been running so far (measured by the backend)
 }
 
 /** An error shown to the user: which stage failed, what happened, what to do. */

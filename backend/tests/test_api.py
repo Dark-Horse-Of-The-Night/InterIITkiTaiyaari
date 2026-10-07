@@ -143,8 +143,9 @@ def test_oversized_file_is_rejected_from_its_header(setup: Setup) -> None:
     ],
 )
 def test_ai_stage_failure_names_the_stage(setup: Setup, stage_client: str, error: Exception, stage: str, expected: str) -> None:
-    fake = {"stt": FakeWhisperClient(error=error), "refiner": FakeRefinerClient(replies=[error]),
-            "documenter": FakeDocumenterClient(error)}[stage_client]
+    # Repeat the error so it is still failing after the automatic retries.
+    fake = {"stt": FakeWhisperClient(error=error), "refiner": FakeRefinerClient(replies=[error] * 3),
+            "documenter": FakeDocumenterClient(*[error] * 3)}[stage_client]
     setattr(setup.clients, stage_client, fake)
 
     job_id = setup.upload(setup.wav()).json()["job_id"]
@@ -198,3 +199,47 @@ def test_temporary_files_are_deleted(setup: Setup, monkeypatch: pytest.MonkeyPat
 def test_safe_filename() -> None:
     assert safe_filename("../../etc/a b?.MP3") == "a_b_.MP3"
     assert safe_filename("meeting.mp3") == "meeting.mp3"
+
+
+def test_retry_note_appears_during_a_stage_and_clears_when_done(setup: Setup) -> None:
+    seen_notes: list[str | None] = []
+    real_set_note = setup.jobs.set_note
+
+    def watch(job_id: str, stage: str, note: str) -> None:
+        real_set_note(job_id, stage, note)
+        stt = next(s for s in setup.jobs.get(job_id).stages if s.name == stage)  # type: ignore[union-attr]
+        seen_notes.append(stt.note)
+
+    setup.jobs.set_note = watch  # type: ignore[method-assign]
+    flaky = FakeWhisperClient(segments=WHISPER_SEGMENTS)
+    first_call = {"done": False}
+    real_create = flaky._create
+
+    def create_failing_once(**kwargs: Any) -> Any:
+        if not first_call["done"]:
+            first_call["done"] = True
+            raise openai.APIConnectionError(request=httpx.Request("POST", "https://x"))
+        return real_create(**kwargs)
+
+    flaky.audio.transcriptions.create = create_failing_once
+    setup.clients.stt = flaky
+
+    job_id = setup.upload(setup.wav()).json()["job_id"]
+    job = setup.client.get(f"/api/meetings/{job_id}").json()
+
+    assert seen_notes == ["Could not connect to the service. Retrying (attempt 2 of 3)…"]
+    assert job["status"] == "done"
+    assert all(stage["note"] is None for stage in job["stages"])  # cleared once the stage finished
+
+
+def test_running_seconds_is_reported_only_while_running(setup: Setup) -> None:
+    job = setup.jobs.create("x.mp3")
+    setup.jobs.update_stage(job.job_id, "Speech-to-text", "running", None)
+    running = setup.jobs.get(job.job_id).model_dump()["stages"][0]  # type: ignore[union-attr]
+
+    assert running["running_seconds"] is not None and running["running_seconds"] >= 0
+    assert "started_at" not in running  # internal field stays internal
+
+    setup.jobs.update_stage(job.job_id, "Speech-to-text", "done", 2.0)
+    done = setup.jobs.get(job.job_id).model_dump()["stages"][0]  # type: ignore[union-attr]
+    assert done["running_seconds"] is None

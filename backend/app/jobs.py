@@ -9,7 +9,7 @@ import time
 import uuid
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, computed_field
 
 from app.pipeline.run import STAGES, MeetingResult
 
@@ -20,6 +20,16 @@ class StageProgress(BaseModel):
     name: str
     state: Literal["pending", "running", "done", "failed"] = "pending"
     seconds: float | None = None
+    note: str | None = None  # e.g. "Slow response from the service. Retrying (attempt 2 of 2)…"
+    started_at: float | None = Field(default=None, exclude=True)  # internal; not sent to the frontend
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def running_seconds(self) -> float | None:
+        """How long this stage has been running so far (None unless running)."""
+        if self.state != "running" or self.started_at is None:
+            return None
+        return round(time.time() - self.started_at, 1)
 
 
 class JobError(BaseModel):
@@ -67,6 +77,16 @@ class JobStore:
                 if progress.name == stage:
                     progress.state = state
                     progress.seconds = seconds
+                    if state == "running":
+                        progress.started_at = time.time()
+                    if state == "done":
+                        progress.note = None
+
+    def set_note(self, job_id: str, stage: str, note: str) -> None:
+        with self._lock:
+            for progress in self._jobs[job_id].stages:
+                if progress.name == stage:
+                    progress.note = note
 
     def finish(self, job_id: str, result: MeetingResult) -> None:
         with self._lock:
@@ -84,6 +104,7 @@ class JobStore:
             for progress in job.stages:
                 if progress.state == "running":
                     progress.state = "failed"
+                    progress.note = None  # the error message replaces any "Retrying…" note
 
     def _remove_expired(self) -> None:
         cutoff = time.time() - JOB_TTL_SECONDS

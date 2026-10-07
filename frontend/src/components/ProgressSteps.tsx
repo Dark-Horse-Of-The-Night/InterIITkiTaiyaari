@@ -9,6 +9,9 @@ const LABELS: Record<string, string> = {
   Documenter: 'Writing the meeting record',
 }
 
+// After this long in one step, reassure the user that a slow AI service isn't a frozen app.
+export const SLOW_STAGE_SECONDS = 20
+
 interface Props {
   stages: StageProgress[]
   active: boolean // true while processing; drives the elapsed-time counter
@@ -27,9 +30,12 @@ export default function ProgressSteps({ stages, active }: Props) {
             className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900"
           >
             <StateIcon state={stage.state} />
-            <span className={`flex-1 text-sm ${stage.state === 'pending' ? 'text-slate-400 dark:text-slate-500' : 'font-medium text-slate-800 dark:text-slate-100'}`}>
-              {LABELS[stage.name] ?? stage.name}
-            </span>
+            <div className="flex-1">
+              <span className={`text-sm ${stage.state === 'pending' ? 'text-slate-400 dark:text-slate-500' : 'font-medium text-slate-800 dark:text-slate-100'}`}>
+                {LABELS[stage.name] ?? stage.name}
+              </span>
+              {stage.state === 'running' && <StageHint stage={stage} />}
+            </div>
             <span className="text-xs text-slate-500 dark:text-slate-400">{describe(stage)}</span>
           </li>
         ))}
@@ -41,6 +47,14 @@ export default function ProgressSteps({ stages, active }: Props) {
       )}
     </div>
   )
+}
+
+/** A retry note from the backend, or a reassurance if the step has been running a while. */
+function StageHint({ stage }: { stage: StageProgress }) {
+  const slow = (stage.running_seconds ?? 0) > SLOW_STAGE_SECONDS
+  const text = stage.note ?? (slow ? 'Taking longer than usual. The AI service may be busy.' : null)
+  if (!text) return null
+  return <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">{text}</p>
 }
 
 function describe(stage: StageProgress): string {

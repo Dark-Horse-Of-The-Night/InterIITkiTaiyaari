@@ -18,6 +18,7 @@ from app.pipeline.api_errors import explain_api_error
 from app.pipeline.errors import STAGE_DOCUMENTER, PipelineError
 from app.pipeline.models import Evidence, MeetingRecord, Segment, Transcript
 from app.pipeline.render import format_time
+from app.pipeline.retry import DOCUMENTER_TIMEOUT, RetriesExhausted, RetryCallback, call_with_retry, llm_timeout
 from app.prompt_loader import load_prompt
 
 MAX_ATTEMPTS = 2  # one retry if the model returns output that doesn't match the schema
@@ -37,14 +38,14 @@ def make_documenter_client(settings: Settings) -> OpenAI:
     return OpenAI(
         base_url=settings.documenter_base_url,
         api_key=settings.documenter_api_key.get_secret_value(),
-        timeout=180,
-        max_retries=2,
+        timeout=llm_timeout(DOCUMENTER_TIMEOUT),
+        max_retries=0,  # retries are done (visibly) by call_with_retry
     )
 
 
-def document(transcript: Transcript, client: Any, model: str) -> MeetingRecord:
+def document(transcript: Transcript, client: Any, model: str, on_retry: RetryCallback | None = None) -> MeetingRecord:
     """Generate the meeting record, then check it against the transcript."""
-    draft = _request_record(client, model, format_transcript(transcript))
+    draft = _request_record(client, model, format_transcript(transcript), on_retry)
     return verify_record(draft, transcript.segments)
 
 
@@ -73,21 +74,25 @@ def _only_required(schema: Any) -> Any:
     return schema
 
 
-def _request_record(client: Any, model: str, transcript_text: str) -> MeetingRecord:
+def _request_record(client: Any, model: str, transcript_text: str, on_retry: RetryCallback | None) -> MeetingRecord:
     """Ask the model for the record, retrying once if the output doesn't match the schema."""
     for _ in range(MAX_ATTEMPTS):
         try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": load_prompt("documenter")},
-                    {"role": "user", "content": transcript_text},
-                ],
-                temperature=0,
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {"name": "meeting_record", "strict": True, "schema": record_json_schema()},
-                },
+            response = call_with_retry(
+                lambda: client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": load_prompt("documenter")},
+                        {"role": "user", "content": transcript_text},
+                    ],
+                    temperature=0,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {"name": "meeting_record", "strict": True, "schema": record_json_schema()},
+                    },
+                ),
+                STAGE_DOCUMENTER,
+                on_retry,
             )
             return MeetingRecord.model_validate_json(response.choices[0].message.content or "")
         except ValidationError:
@@ -96,7 +101,7 @@ def _request_record(client: Any, model: str, transcript_text: str) -> MeetingRec
             if error.code == "json_validate_failed":  # Groq: the model's output broke the schema
                 continue
             raise explain_api_error(error, STAGE_DOCUMENTER, "DOCUMENTER", model) from None
-        except openai.APIError as error:
+        except (openai.APIError, RetriesExhausted) as error:
             raise explain_api_error(error, STAGE_DOCUMENTER, "DOCUMENTER", model) from None
 
     raise PipelineError(

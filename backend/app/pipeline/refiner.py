@@ -21,6 +21,7 @@ from app.pipeline.api_errors import explain_api_error
 from app.pipeline.errors import STAGE_REFINER, PipelineError
 from app.pipeline.models import Correction, RefinedTranscript, Segment, Transcript
 from app.pipeline.render import format_time
+from app.pipeline.retry import REFINER_TIMEOUT, RetriesExhausted, RetryCallback, call_with_retry, llm_timeout
 from app.prompt_loader import load_prompt
 
 BATCH_SIZE = 40  # segments per request, so long meetings don't hit output limits
@@ -60,12 +61,18 @@ def make_refiner_client(settings: Settings) -> OpenAI:
     return OpenAI(
         base_url=settings.refiner_base_url,
         api_key=settings.refiner_api_key.get_secret_value(),
-        timeout=120,
-        max_retries=2,
+        timeout=llm_timeout(REFINER_TIMEOUT),
+        max_retries=0,  # retries are done (visibly) by call_with_retry
     )
 
 
-def refine(transcript: Transcript, client: Any, model: str, glossary: list[str] | None = None) -> RefinedTranscript:
+def refine(
+    transcript: Transcript,
+    client: Any,
+    model: str,
+    glossary: list[str] | None = None,
+    on_retry: RetryCallback | None = None,
+) -> RefinedTranscript:
     """Correct misrecognised terms in every segment, keeping timestamps and meaning."""
     system_prompt = build_system_prompt(glossary)
     segments = transcript.segments
@@ -76,7 +83,7 @@ def refine(transcript: Transcript, client: Any, model: str, glossary: list[str] 
     for batch_start in range(0, len(segments), BATCH_SIZE):
         batch = segments[batch_start : batch_start + BATCH_SIZE]
         ids = list(range(batch_start, batch_start + len(batch)))
-        proposed = _request_batch(client, model, system_prompt, ids, batch)
+        proposed = _request_batch(client, model, system_prompt, ids, batch, on_retry)
 
         for segment_id, segment in zip(ids, batch):
             new_text = proposed[segment_id]
@@ -104,7 +111,7 @@ def build_system_prompt(glossary: list[str] | None) -> str:
 
 
 def _request_batch(
-    client: Any, model: str, system_prompt: str, ids: list[int], batch: list[Segment]
+    client: Any, model: str, system_prompt: str, ids: list[int], batch: list[Segment], on_retry: RetryCallback | None
 ) -> dict[int, str]:
     """Ask the model to refine one batch. Returns {segment id: proposed text}."""
     user_message = json.dumps(
@@ -112,14 +119,18 @@ def _request_batch(
     )
     for _ in range(MAX_ATTEMPTS):
         try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=0,
-                response_format={"type": "json_object"},
+            response = call_with_retry(
+                lambda: client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message},
+                    ],
+                    temperature=0,
+                    response_format={"type": "json_object"},
+                ),
+                STAGE_REFINER,
+                on_retry,
             )
             return parse_reply(response.choices[0].message.content, ids)
         except BadModelOutput:
@@ -128,7 +139,7 @@ def _request_batch(
             if error.code == "json_validate_failed":  # Groq: the model produced invalid JSON
                 continue
             raise explain_api_error(error, STAGE_REFINER, "REFINER", model) from None
-        except openai.APIError as error:
+        except (openai.APIError, RetriesExhausted) as error:
             raise explain_api_error(error, STAGE_REFINER, "REFINER", model) from None
 
     raise PipelineError(

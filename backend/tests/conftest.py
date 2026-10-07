@@ -20,6 +20,14 @@ FAKE_ENV = {
 
 
 @pytest.fixture(autouse=True)
+def no_real_waiting(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """Skip the pauses between retries; record them instead so tests can check them."""
+    waits: list[float] = []
+    monkeypatch.setattr("app.pipeline.retry.sleep", waits.append)
+    return waits
+
+
+@pytest.fixture(autouse=True)
 def clear_real_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Remove any real settings from the shell environment so tests stay isolated."""
     for name in [*FAKE_ENV, "MAX_UPLOAD_MB"]:

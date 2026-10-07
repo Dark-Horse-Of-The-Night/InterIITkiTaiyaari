@@ -197,6 +197,7 @@ def process_meeting(
         result = run_pipeline(
             audio_path, settings, clients, glossary,
             on_progress=lambda stage, state, seconds: jobs.update_stage(job_id, stage, state, seconds),
+            on_note=lambda stage, note: jobs.set_note(job_id, stage, note),
         )
         jobs.finish(job_id, result)
     except PipelineError as error:

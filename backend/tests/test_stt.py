@@ -88,7 +88,7 @@ def test_no_speech_gives_clear_error(audio: Path) -> None:
         (api_error(openai.BadRequestError, 400), "exporting the recording as .mp3"),
         (api_error(openai.InternalServerError, 500), "unexpected error"),
         (openai.APIConnectionError(request=FAKE_REQUEST), "Check your internet connection"),
-        (openai.APITimeoutError(request=FAKE_REQUEST), "Check your internet connection"),
+        (openai.APITimeoutError(request=FAKE_REQUEST), "did not respond in time (tried 2 times)"),
     ],
 )
 def test_api_errors_become_plain_english(audio: Path, error: Exception, expected: str) -> None:
