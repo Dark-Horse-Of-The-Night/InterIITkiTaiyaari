@@ -1,0 +1,169 @@
+{
+  "summary": "The team reviewed the mobile release, covering an Android crash, analytics migration, beta testing, and Dark Mode. Neha was assigned to fix the crash by March 3rd, and the group decided to switch analytics to Mixpanel and postpone Dark Mode to the next release. Open items include investigating a push notification bug, sending release notes, and confirming the App Store review timeline.",
+  "minutes": [
+    {
+      "topic": "Android crash",
+      "points": [
+        "Crash caused by image cache",
+        "Neha assigned to fix the crash",
+        "Fix to be ready by March 3rd"
+      ],
+      "segment_ids": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "topic": "Analytics migration",
+      "points": [
+        "Suggestion to move analytics from Firebase to Mixpanel",
+        "Agreement to switch to Mixpanel"
+      ],
+      "segment_ids": [
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "topic": "Beta testers list",
+      "points": [
+        "Commitment to handle beta testers list"
+      ],
+      "segment_ids": [
+        9
+      ]
+    },
+    {
+      "topic": "Push notification bug",
+      "points": [
+        "Proposal for John to investigate the push notification bug"
+      ],
+      "segment_ids": [
+        10
+      ]
+    },
+    {
+      "topic": "Release notes",
+      "points": [
+        "Suggestion to send out release notes soon"
+      ],
+      "segment_ids": [
+        11
+      ]
+    },
+    {
+      "topic": "Dark Mode",
+      "points": [
+        "Initially planned for this release",
+        "Decision to postpone Dark Mode to next release"
+      ],
+      "segment_ids": [
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "topic": "App Store review time",
+      "points": [
+        "Question about whether App Store review takes a week"
+      ],
+      "segment_ids": [
+        16,
+        17
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "text": "Switch analytics from Firebase to Mixpanel",
+      "evidence": {
+        "segment_ids": [
+          7
+        ],
+        "quote": "Okay. Let's do that.",
+        "start": 20.1
+      }
+    },
+    {
+      "text": "Move Dark Mode to the next release",
+      "evidence": {
+        "segment_ids": [
+          15
+        ],
+        "quote": "Let's move Dark Mode to the next release.",
+        "start": 39.039997
+      }
+    }
+  ],
+  "action_items": [
+    {
+      "task": "Fix Android crash caused by image cache",
+      "owner": "Neha",
+      "deadline": "March 3rd",
+      "evidence": {
+        "segment_ids": [
+          4
+        ],
+        "quote": "Sure. I'll have the fix ready by March 3rd.",
+        "start": 10.34
+      }
+    },
+    {
+      "task": "Compile beta testers list",
+      "owner": null,
+      "deadline": null,
+      "evidence": {
+        "segment_ids": [
+          9
+        ],
+        "quote": "I'll take care of the beta testers list.",
+        "start": 23.359999
+      }
+    }
+  ],
+  "open_items": [
+    {
+      "text": "John could look at the push notification bug",
+      "kind": "proposal",
+      "raised_by": null,
+      "evidence": {
+        "segment_ids": [
+          10
+        ],
+        "quote": "Maybe John could look at the push notification bug?",
+        "start": 26.82
+      }
+    },
+    {
+      "text": "Send out the release notes soon",
+      "kind": "proposal",
+      "raised_by": null,
+      "evidence": {
+        "segment_ids": [
+          11
+        ],
+        "quote": "we should send out the release notes soon.",
+        "start": 29.439999
+      }
+    },
+    {
+      "text": "Does the App Store review take a week?",
+      "kind": "question",
+      "raised_by": null,
+      "evidence": {
+        "segment_ids": [
+          16
+        ],
+        "quote": "does anyone know if the App Store review takes a week?",
+        "start": 41.46
+      }
+    }
+  ],
+  "warnings": []
+}
