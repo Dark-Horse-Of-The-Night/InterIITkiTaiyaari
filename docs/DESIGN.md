@@ -7,6 +7,7 @@ This document explains *why* the AI Meeting Assistant is built the way it is. Mo
 2. [Stage 1: speech-to-text](#2-stage-1-speech-to-text)
 3. [Stage 2: refiner](#3-stage-2-refiner)
 4. [Stage 3: documenter](#4-stage-3-documenter)
+4b. [Speakers: labels and names](#4b-speakers-labels-and-names)
 5. [Long meetings](#5-long-meetings)
 6. [Reliability: timeouts, retries, rate limits](#6-reliability-timeouts-retries-rate-limits)
 7. [Web app](#7-web-app)
@@ -64,6 +65,10 @@ An omitted segment can never change meaning, so this is both cheaper and safer.
 
 The corrections list (`CICD → CI/CD`) is computed by code from a word diff, not taken from the model.
 
+**Spacing and capitalisation of product names.** The first version missed names spelled right but spaced or capitalised wrong. On the 13-minute meeting the raw transcript still contained "open telemetry" (4×) and "Launch Darkly". The prompt now covers this, using *different* example terms (Elasticsearch, DynamoDB, Next.js) so the test terms stay unseen. Result on that meeting: it now fixes `open telemetry → OpenTelemetry` and `launch darkly → LaunchDarkly`. Low reasoning effort beat medium: 6 vs 5 fixes, 1,164 vs 2,199 output tokens, 12 s vs 51 s, and medium made one edit that broke a negation, which the checks caught.
+
+**Terms split across segments.** Whisper split "open | telemetry" across two segments. Fixing the first to "OpenTelemetry" would leave "OpenTelemetry telemetry". Words can't move between segments (timestamps belong to them), so a new check rejects any edit that would repeat a word continuing in the next segment, or starting in the previous one.
+
 **Trap test** (a hand-written transcript with misheard terms plus traps): fixed Kubernetes, PostgreSQL, MongoDB, GitHub Actions, OAuth, JSON Web Tokens, TypeScript and S3. It left alone "Jenkins from the platform team" (a person), "Ruby said…" (a person), "fifteen thousand", "two more sprints", "not switching" and "nobody agreed".
 
 ## 4. Stage 3: documenter
@@ -78,6 +83,20 @@ The corrections list (`CICD → CI/CD`) is computed by code from a word diff, no
 **Classification rules** in [`documenter.md`](../backend/app/prompts/documenter.md): a decision needs agreement; **postponing is not deciding** (added after a test recorded "we agreed to think about it" as a decision); a proposal is not a decision; an unaccepted suggestion is not a task; a reversal keeps only the final outcome. "Someone needs to update the docs" with no volunteer is an action item with owner Unspecified, so the gap stays visible.
 
 **Markdown is rendered by code** ([`render.py`](../backend/app/pipeline/render.py)), not by the LLM, so Markdown and JSON always contain the same items.
+
+## 4b. Speakers: labels and names
+
+The problem statement asks for real speaker names where they can be worked out, and labels otherwise. Whisper doesn't identify speakers, so this is two steps:
+
+1. **Who spoke (stage 1, [`speakers.py`](../backend/app/pipeline/speakers.py)).** A local voice model (SpeechBrain ECAPA, ~90 MB, no account needed) turns each Whisper segment into a voice fingerprint. Segments are grouped by average-linkage clustering on cosine distance (plain NumPy) and numbered in order of first speaking: **Speaker 1, Speaker 2…** Segments under 0.8 s borrow the previous label. These labels appear in the **raw** transcript. The packages are optional: without them, transcripts have no labels.
+2. **Real names (stage 2, [`speaker_names.py`](../backend/app/pipeline/speaker_names.py)).** One LLM call proposes names with evidence. **Code accepts a name only if:**
+   - the quote really is in the transcript and contains the name; and
+   - either it's a **self-introduction** in that speaker's own line ("this is Tom…", "I'm Priya"), or another speaker says the name **to someone** (name followed by a comma or question mark: "Neha, can you…?", "…take a look, Neha?") and the **next different voice** is that speaker.
+   - Two names for one voice, or one name for two voices, means neither is used.
+   - A name that's only mentioned ("Rahul said yesterday…") is rejected. The tests caught an early version that would have accepted it.
+
+   Names replace labels in the **refined** transcript. That is also what makes raw and refined differ even when Whisper heard every term correctly.
+3. **Owners.** The documenter sees who said each line. "I'll have a fix ready by Friday" spoken by an identified *Neha* makes Neha the owner, and the owner check counts a line's identified speaker as "stated". From an unnamed "Speaker 2", "I" is still unknown, so the owner stays Unspecified; a label is never an owner.
 
 ## 5. Long meetings
 
@@ -115,7 +134,7 @@ Before this change, a hung service could leave the app spinning for ~15 minutes 
 - **Upload → job → poll.** `POST /api/meetings` checks the file immediately (bad files fail in under a second) and returns a job id; processing runs in the background; the frontend polls once a second and shows each stage's state, "Part N of M", retry notes and timings.
 - **Upload limits** are enforced twice: from `Content-Length` before the body is read, and by counting bytes while saving. Temporary files are always deleted.
 - **Downloads** are generated in the browser from data already received; the server stores nothing.
-- **Frontend** is React + Vite + TypeScript with Tailwind CSS; it follows the system's light or dark mode and works at phone width.
+- **Frontend** is React + Vite + TypeScript with Tailwind CSS, designed first as mockups (the "Ledger" look: Geist type, one teal accent, evidence quotes with timestamp chips, Unspecified as a visible dashed tag). It follows the system's light or dark mode and works at phone width. Speakers appear at the start of each turn, with a sidebar explaining how each name was identified.
 
 ## Evaluation
 
@@ -127,8 +146,9 @@ All test meetings were generated with macOS `say` from known scripts ([`scripts/
 | **`samples/hard_meeting`** (48 s) | ✅ Proposal accepted later → **decision** (Mixpanel), not also an open item · reversed plan → final outcome only (Dark Mode next release) · "Neha, can you… by March 3rd?" "Sure, I'll…" → owner Neha, deadline as spoken · "I'll take care of the beta list" → **Unspecified** · "Maybe John could look at…?" (no reply) → open proposal, John *not* listed as raiser · unanswered question → open question |
 | **13-minute meeting**, two-step documenter | ✅ Documented in 4 parts (one automatically split after a cut-off) + cross-check, ~5 min on the free tier. All **7/7** action items with correct owner and deadline, all **4/4** decisions, all **5** distinct proposals, with repeats across parts merged. ❌ Two "we agreed to think about it" statements were recorded as decisions. This led to the "postponing is not deciding" rule, which has **not yet been re-verified** on this meeting |
 | **35-minute meeting with cross-part traps** | ⚠️ **Partial.** Transcription (8 parts) and refiner (11 batches) completed in the browser with live progress. The documenter reached part 3 of 10 and then hit the free tier's **daily** token limit (197,464 / 200,000 used during development). The cross-part traps (proposal in part 1 accepted at 70%, decision reversed at 90%, owner + deadline at 30%) are covered by unit tests with fake model replies, but not yet verified with the real model |
+| **5-voice meeting, speaker naming** (`scripts/make_speaker_meeting.py`, 56 s; true labels supplied to isolate the naming step) | ✅ **3/3** provable names in 2/2 runs: Neha and Rahul (addressed, then answer) and Tom (self-introduction). The host and the questioner, never named, stay **Speaker 1 / Speaker 5**. Documenter: crash fix → **Neha**, by Friday; Mixpanel account → **Tom**, this week; release notes → **Unspecified** (Neha declined). The answered App Store question correctly isn't an open item. The first prompt version found only 2/3; asking it to check every addressed name fixed that |
 | **Error handling** | ✅ Text file renamed `.mp3` · empty file · unsupported format · oversized upload · no file · unknown job · wrong key · rate limits · hung service · daily limit: each gives a specific stage + message + fix |
-| **Automated tests** | ✅ 143 backend (pytest) + 25 frontend (Vitest) |
+| **Automated tests** | ✅ 168 backend (pytest) + 27 frontend (Vitest) |
 
 **Run-to-run variation.** LLM output varies slightly even at temperature 0 (e.g. "by March 3rd" vs "March 3rd", different task wording). Across repeated runs of `hard_meeting`, the classification (decision vs proposal, owners, Unspecified) stayed the same.
 
@@ -139,5 +159,5 @@ All test meetings were generated with macOS `say` from known scripts ([`scripts/
 1. Re-run the 35-minute trap meeting once the daily token limit resets, and re-check the 13-minute meeting with the "postponing is not deciding" rule.
 2. Measure `reasoning_effort="low"` for the documenter on the trap meetings. If classification holds, it would cut cut-offs and token use roughly in half.
 3. Evaluate on real recordings (noise, crosstalk, accents) and compare FLAC vs Opus there.
-4. Speaker diarisation, so "I'll do it" can be attributed to a person.
+4. Better speaker separation (e.g. pyannote) for segments where two people talk, and evaluation of voice grouping on real recordings.
 5. Persist jobs (e.g. SQLite) so results survive a server restart.

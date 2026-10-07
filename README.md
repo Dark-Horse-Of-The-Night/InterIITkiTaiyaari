@@ -1,6 +1,6 @@
 # AI Meeting Assistant
 
-Upload an English meeting recording and get back three things: the **raw transcript**, a **refined transcript** with misheard technical terms corrected, and a **structured meeting record** (summary, minutes by topic, key decisions, action items, and open proposals/questions) in both **Markdown and JSON**. Built with a FastAPI backend and a React + Vite + TypeScript frontend as a solo submission for the Inter IIT Tech Meet bootcamp ML problem statement.
+Upload an English meeting recording and get back three things: the **raw transcript** (with who spoke each line), a **refined transcript** with misheard technical terms corrected and speakers named where the recording makes it clear, and a **structured meeting record** (summary, minutes by topic, key decisions, action items, and open proposals/questions) in both **Markdown and JSON**. Built with a FastAPI backend and a React + Vite + TypeScript frontend as a solo submission for the Inter IIT Tech Meet bootcamp ML problem statement.
 
 The record is designed to be trustworthy: every decision, action item and open item is backed by an exact quote from the transcript, and code (not just the prompt) removes anything the model can't back up. Owners and deadlines that weren't said out loud are shown as **Unspecified**, never guessed.
 
@@ -41,8 +41,8 @@ More detail on design decisions, measurements and evaluation: **[docs/DESIGN.md]
 
 | Output | Description |
 |---|---|
-| **Raw transcript** | Whisper's output with timestamps, unchanged |
-| **Refined transcript** | Same segments and timestamps, with misrecognised technical terms fixed (`CICD → CI/CD`, `cooper netties → Kubernetes`). Each correction is highlighted in the app; hover to see what Whisper heard |
+| **Raw transcript** | Whisper's output with timestamps, each line labelled by voice: **Speaker 1**, **Speaker 2**… |
+| **Refined transcript** | Same segments and timestamps, with misrecognised technical terms fixed (`CICD → CI/CD`, `open telemetry → OpenTelemetry`) and speakers given **real names where the recording proves them** (someone introduces themselves, or is addressed by name and answers). Others keep their label rather than a guess. Corrections are highlighted; hover to see what Whisper heard |
 | **Meeting record** | Summary · minutes by topic · key decisions · action items (task, owner, deadline) · open proposals and questions. Every item shows its timestamp and supporting quote |
 | **Downloads** | `record.md`, `record.json`, `refined-transcript.txt`, `raw-transcript.txt`. The Markdown and JSON are generated from the same data |
 
@@ -68,6 +68,12 @@ python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env
 ```
+Optional, for speaker labels and names (installs PyTorch + SpeechBrain, ~300 MB; the voice model, ~90 MB, downloads once on first use):
+```bash
+.venv/bin/pip install -r requirements-speakers.txt
+```
+Without it everything still works; transcripts just have no speaker labels.
+
 Open `backend/.env` and replace the three `your-groq-api-key-here` values with your Groq key. Then start the server:
 ```bash
 .venv/bin/uvicorn app.main:app --reload
@@ -82,7 +88,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Open <http://localhost:5173>, drop in a recording (`.mp3 .wav .m4a .flac .ogg .webm .mp4 .mpeg .mpga`, up to 200 MB / 120 minutes), optionally list terms used in the meeting (e.g. `Zephyr, KubeFlow`), and click **Process recording**.
+Open <http://localhost:5173> (a calm "ledger" look, light and dark mode), drop in a recording (`.mp3 .wav .m4a .flac .ogg .webm .mp4 .mpeg .mpga`, up to 200 MB / 120 minutes), optionally list terms used in the meeting (e.g. `Zephyr, KubeFlow`), and click **Process recording**.
 
 A short meeting takes about 10–15 seconds. Try one of the [samples](#samples) first.
 
@@ -99,8 +105,8 @@ Three distinct stages, always in this order. Each has its own model setting and 
 
 | Stage | What it does | Default model (Groq) |
 |---|---|---|
-| **1. Speech-to-text** | Checks the file (format, empty, unreadable, size, duration), converts it to 16 kHz mono Opus, splits long recordings into ~5-minute parts at pauses in speech, and transcribes each part with timestamps | `whisper-large-v3` |
-| **2. Refiner** | Fixes misrecognised technical terms, acronyms and product names **only**. The model returns just the segments it changed; code then rejects any edit that changes a number, negation, commitment word, punctuation, or rewrites too much | `openai/gpt-oss-120b` |
+| **1. Speech-to-text** | Checks the file (format, empty, unreadable, size, duration), converts it to 16 kHz mono Opus, splits long recordings into ~5-minute parts at pauses in speech, transcribes each part with timestamps, then **labels who is speaking** by comparing voices (SpeechBrain ECAPA, runs locally) | `whisper-large-v3` + `spkrec-ecapa-voxceleb` |
+| **2. Refiner** | Fixes misrecognised technical terms, acronyms and product names **only**. The model returns just the segments it changed; code then rejects any edit that changes a number, negation, commitment word, punctuation, duplicates a word split across segments, or rewrites too much. Then **names speakers** where the transcript proves it; code checks every name's evidence | `openai/gpt-oss-120b` |
 | **3. Documenter** | Produces the structured record with strict JSON-schema output. Every item must quote the transcript; code verifies quotes, owners and deadlines. Long meetings are documented in parts, joined by code, and cross-checked | `openai/gpt-oss-120b` |
 
 All providers are called through the **OpenAI Python SDK** using `base_url`, so any OpenAI-compatible service works by changing `backend/.env`. Prompts live in [`backend/app/prompts/`](backend/app/prompts/).
@@ -121,6 +127,7 @@ Errors always have the same shape: `{"error": {"stage", "message", "fix"}}`.
 |---|---|
 | **Never invent a task owner or deadline** | The prompt says so, **and** code checks every owner is a name stated in or just before the quoted lines, and every deadline appears word for word there. Otherwise it's set to `null` → shown as **Unspecified**, with a note. "I'll do it" / "we will" / "someone" always become Unspecified (there are no speaker labels, so "I" is unknown) |
 | **A proposal is not a decision; an unaccepted suggestion is not a task** | Explicit classification rules in [`documenter.md`](backend/app/prompts/documenter.md), including "postponing is not deciding". For long meetings, a cross-check turns a proposal that's **accepted later** into a decision and keeps only the **final** outcome of a reversed decision. Code validates each such change |
+| **Speaker names are never guessed** | A label becomes a name only if code confirms the evidence: the quote is in the transcript and is either the speaker's own introduction ("this is Tom…") or another person saying the name *to someone* ("Neha, can you…?") with that speaker answering next. A name that's merely mentioned ("Rahul said…") proves nothing. Otherwise the line keeps "Speaker N" |
 | **Refiner preserves names, numbers, negation and commitments** | Code compares every edit with the original: numbers (with "five" = "5"), negation words (incl. "haven't"), commitment words (will, should, might, decided…), sentence punctuation, and overall similarity. Failing edits are discarded and listed as warnings |
 | **No hardcoded or prewritten outputs** | Everything comes from the pipeline. Code only checks, removes, joins and formats model output |
 | **Clear errors for unsupported, empty or unreadable files** | Checked before any AI call, e.g. *"File check failed: the file could not be read as audio (it may be corrupt or not really an audio file). Check that the recording plays on your computer, then upload it again."* |
@@ -136,6 +143,7 @@ All settings live in `backend/.env` (copy `.env.example`; never commit `.env`).
 | `STT_BASE_URL`, `STT_API_KEY`, `STT_MODEL` | Groq, `whisper-large-v3` | Speech-to-text provider |
 | `REFINER_BASE_URL`, `REFINER_API_KEY`, `REFINER_MODEL` | Groq, `openai/gpt-oss-120b` | Refiner provider |
 | `DOCUMENTER_BASE_URL`, `DOCUMENTER_API_KEY`, `DOCUMENTER_MODEL` | Groq, `openai/gpt-oss-120b` | Documenter provider |
+| `SPEAKER_LABELS` | `true` | Label and name speakers (needs `requirements-speakers.txt`; ignored if not installed) |
 | `DOCUMENTER_MAX_REQUEST_TOKENS` | `7500` | Each documenter request stays under this size. Fits Groq's free tier (8,000 tokens/minute); raise it on a paid plan so long meetings need fewer requests |
 | `MAX_UPLOAD_MB` | `200` | Largest upload accepted |
 | `MAX_AUDIO_MINUTES` | `120` | Longest recording accepted |
@@ -156,8 +164,8 @@ Rough timings on the free tier: short meeting 10–15 s; 13-minute meeting ~5 mi
 ## Testing
 
 ```bash
-cd backend && .venv/bin/pytest          # 143 tests
-cd frontend && npm test                 # 25 tests
+cd backend && .venv/bin/pytest          # 168 tests
+cd frontend && npm test                 # 27 tests
 cd frontend && npm run build && npm run lint
 ```
 
@@ -168,7 +176,7 @@ Tests never call real AI services. They use fake clients (including failures, ra
 python3 scripts/make_test_meeting.py 15 my_meeting            # ~15 minutes
 python3 scripts/make_test_meeting.py 40 long_meeting --traps  # with cross-meeting traps
 ```
-The script text in `scratch/` is the ground truth to compare the record against.
+The script text in `scratch/` is the ground truth to compare the record against. For speakers, `python3 scripts/make_speaker_meeting.py` makes a 5-voice meeting where three people can be named from the audio and two can't.
 
 ## Samples
 
@@ -186,10 +194,12 @@ backend/
     config.py            Settings from backend/.env (keys hidden when printed)
     jobs.py              In-memory job store with per-stage progress
     prompt_loader.py     Loads prompts/*.md
-    prompts/             refiner.md, documenter.md, documenter_reconcile.md
+    prompts/             refiner.md, speaker_names.md, documenter.md, documenter_reconcile.md
     pipeline/            No FastAPI imports in here
       audio.py           File checks, conversion, splitting at pauses (ffmpeg)
       stt.py             Stage 1: speech-to-text
+      speakers.py        Stage 1: speaker labels by voice (optional SpeechBrain model)
+      speaker_names.py   Stage 2: evidence-checked speaker names
       refiner.py         Stage 2: term correction + safety checks
       documenter.py      Stage 3: record + quote/owner/deadline checks
       merge.py           Joining a long meeting's parts + validated cross-check
@@ -208,12 +218,12 @@ frontend/
     test/                Vitest + React Testing Library
 docs/DESIGN.md           Design decisions, measurements, evaluation
 samples/                 Example recordings with real outputs
-scripts/                 make_test_meeting.py (test meeting generator)
+scripts/                 make_test_meeting.py, make_speaker_meeting.py (test meeting generators)
 ```
 
 ## Known limitations
 
-- **No speaker identification.** Whisper doesn't label speakers, so "I'll do it" can't be attributed. The owner becomes Unspecified rather than a guess.
+- **Speaker labels are approximate.** Voices are compared per Whisper segment, so two people speaking within one segment share a label, and very short segments borrow the previous label. "I'll do it" is attributed only when that speaker has been *named*; from an unnamed "Speaker 2" the owner stays Unspecified. Synthetic test voices are far more distinct than real colleagues.
 - **English only.** Whisper is told the language is English.
 - **Free-tier throughput.** About 1–2 long meetings per model per day; long meetings take several minutes because of rate limits.
 - **Jobs live in memory.** Restarting the backend forgets in-progress and finished jobs (results are downloadable in the browser).
