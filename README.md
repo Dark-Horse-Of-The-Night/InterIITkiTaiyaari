@@ -157,7 +157,7 @@ Long meetings work, but the free tier's limits shape how:
 - **Audio:** split into ~5-minute parts (~1.1 MB each) at pauses, so uploads are small and no word is cut in half. Free tier: 2 hours of audio per hour.
 - **Refiner:** batches of 40 segments; rate limits are waited out automatically ("Waiting 14s, then trying again…").
 - **Documenter:** a request can't exceed **8,000 tokens per minute**, so meetings longer than a few minutes are documented in parts, joined by code, and cross-checked by one small request. If a part's reply is cut off, that part is split in half automatically.
-- **Daily limit:** each model allows **200,000 tokens per day**. A ~35-minute meeting needs roughly 100,000, so expect **about 1–2 long meetings per day** per model on the free tier (short meetings use a few thousand). When the daily limit is hit, the app stops and says when to try again.
+- **Daily limit:** each model allows **200,000 tokens per day**. A ~35-minute meeting needs roughly 100,000, so expect **about 1–2 long meetings per day** per model on the free tier (short meetings use a few thousand). When the daily limit is hit, the app stops and says when to try again. To keep going the same day, switch `REFINER_MODEL` and `DOCUMENTER_MODEL` to `openai/gpt-oss-20b`, which has its own allowance (slightly weaker at classification).
 
 Rough timings on the free tier: short meeting 10–15 s; 13-minute meeting ~5 minutes (mostly rate-limit waits). A paid Groq plan removes most of the waiting.
 
@@ -180,9 +180,10 @@ The script text in `scratch/` is the ground truth to compare the record against.
 
 ## Samples
 
-[`samples/`](samples/) contains two short synthetic meetings and the pipeline's real output for each (audio, raw and refined transcripts, `record.md`, `record.json`):
+[`samples/`](samples/) contains three short synthetic meetings and the pipeline's real output for each (audio, raw and refined transcripts, `record.md`, `record.json`):
 
 - **[`meeting`](samples/meeting/record.md)**: a sprint planning with an owner + deadline ("Priya… by Friday"), an unaccepted proposal, a decision, and a task nobody volunteered for (→ Unspecified).
+- **[`speakers_meeting`](samples/speakers_meeting/refined_transcript.txt)**: five different voices. The raw transcript labels them Speaker 1–5; the refined transcript names **Neha** and **Rahul** (addressed by name, then answer) and **Tom** (introduces himself), while the host and a questioner, never named, keep their labels. Neha and Tom become owners of what they said "I'll…" about. `expected.txt` is the ground truth. (Generated with `openai/gpt-oss-20b`.)
 - **[`hard_meeting`](samples/hard_meeting/record.md)**: a proposal that is accepted later (→ decision), a decision that's reversed (→ final outcome only), "I'll take care of it" (→ Unspecified owner), an unanswered suggestion, and an unanswered question.
 
 ## Project structure

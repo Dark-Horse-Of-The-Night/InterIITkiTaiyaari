@@ -1,0 +1,18 @@
+Who said each line (ground truth):
+  Host (never named)         | Samantha | Good morning, everyone. Let's go through the mobile release.
+  Host (never named)         | Samantha | Neha, can you give us an update on the Android crash?
+  Neha                       | Karen    | Sure. The crash comes from the image cache. I'll have a fix ready by Friday.
+  Host (never named)         | Samantha | Great, thanks. Rahul, anything on the analytics side?
+  Rahul                      | Rishi    | Yes. I'd suggest we move our analytics from Firebase to Mixpanel. It's cheaper for our volume.
+  Tom                        | Daniel   | Hi, this is Tom from the platform team. I think that's a good idea, and I'll set up the Mixpanel account this week.
+  Host (never named)         | Samantha | Okay, let's do that. We'll switch to Mixpanel.
+  Questioner (never named)   | Moira    | Quick question. Does anyone know if the App Store review still takes a week?
+  Rahul                      | Rishi    | Last time it took about three days.
+  Host (never named)         | Samantha | Good. Someone needs to update the release notes, but we can sort that out later.
+  Neha                       | Karen    | I can't take that on this week, sorry.
+  Host (never named)         | Samantha | No problem. That's everything. Thanks, everyone.
+
+Expected speaker names: Neha (addressed, then answers), Rahul (addressed, then answers),
+Tom (introduces himself). The host and the questioner must stay unnamed (Speaker N).
+Expected owners: Neha -> fix the Android crash (by Friday); Tom -> set up the Mixpanel account (this week).
+Release notes: no owner (Neha declined) -> Unspecified.

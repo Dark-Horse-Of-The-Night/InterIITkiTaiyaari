@@ -1,0 +1,113 @@
+{
+  "summary": "The team reviewed the mobile release, discussed an Android crash fix, decided to switch analytics to Mixpanel, clarified App Store review timing, and noted the need to update release notes.",
+  "minutes": [
+    {
+      "topic": "Android crash",
+      "points": [
+        "Crash originates from image cache.",
+        "Fix will be ready by Friday."
+      ],
+      "segment_ids": [
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "topic": "Analytics migration",
+      "points": [
+        "Move from Firebase to Mixpanel.",
+        "Mixpanel cheaper for volume.",
+        "Tom will set up account this week.",
+        "Speaker 1 approves switch."
+      ],
+      "segment_ids": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        15,
+        16,
+        17
+      ]
+    },
+    {
+      "topic": "App Store review",
+      "points": [
+        "Speaker 5 asks if review still takes a week.",
+        "Rahul says last time about three days."
+      ],
+      "segment_ids": [
+        18,
+        19,
+        20
+      ]
+    },
+    {
+      "topic": "Release notes",
+      "points": [
+        "Release notes need updating.",
+        "Neha cannot take it this week."
+      ],
+      "segment_ids": [
+        20,
+        21
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "text": "We'll switch to Mixpanel.",
+      "evidence": {
+        "segment_ids": [
+          17
+        ],
+        "quote": "We'll switch to Mixpanel.",
+        "start": 31.859999
+      }
+    }
+  ],
+  "action_items": [
+    {
+      "task": "Have fix ready by Friday.",
+      "owner": "Neha",
+      "deadline": "Friday",
+      "evidence": {
+        "segment_ids": [
+          5
+        ],
+        "quote": "I'll have a fix ready by Friday.",
+        "start": 10.559999
+      }
+    },
+    {
+      "task": "Set up Mixpanel account this week.",
+      "owner": "Tom",
+      "deadline": "this week",
+      "evidence": {
+        "segment_ids": [
+          16
+        ],
+        "quote": "And I'll set up the Mixpanel account this week.",
+        "start": 28.859999
+      }
+    }
+  ],
+  "open_items": [
+    {
+      "text": "Does anyone know if the App Store review still takes a week?",
+      "kind": "question",
+      "raised_by": null,
+      "evidence": {
+        "segment_ids": [
+          18
+        ],
+        "quote": "Quick question. Does anyone know if the App Store review still takes a week?",
+        "start": 35.579998
+      }
+    }
+  ],
+  "warnings": []
+}
