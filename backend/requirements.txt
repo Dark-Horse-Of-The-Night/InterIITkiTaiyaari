@@ -1,0 +1,14 @@
+# Web framework and server
+fastapi>=0.142,<1
+uvicorn[standard]>=0.54,<1
+python-multipart>=0.0.32   # file uploads
+
+# One SDK for every model provider (via base_url)
+openai>=3.26,<4
+
+# Settings loaded from backend/.env
+pydantic-settings>=2.15,<3
+
+# Testing
+pytest>=9.1,<10
+httpx>=0.28,<1             # used by FastAPI's TestClient
