@@ -108,9 +108,8 @@ def refine(
             refined_texts.append(new_text)
             corrections.extend(find_corrections(segment_id, segment.text, new_text))
 
-    refined_segments = [
-        Segment(start=seg.start, end=seg.end, text=text) for seg, text in zip(segments, refined_texts)
-    ]
+    # model_copy keeps every other field (timestamps, speaker) exactly as it was.
+    refined_segments = [seg.model_copy(update={"text": text}) for seg, text in zip(segments, refined_texts)]
     return RefinedTranscript(segments=refined_segments, corrections=corrections, warnings=warnings)
 
 

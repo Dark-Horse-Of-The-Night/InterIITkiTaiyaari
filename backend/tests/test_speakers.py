@@ -55,12 +55,21 @@ def test_voices_are_grouped_and_numbered_in_order_of_first_speaking(tmp_path: Pa
     assert [s.text for s in labelled] == [s.text for s in segments]  # text and times untouched
 
 
-def test_short_segments_borrow_the_previous_label(tmp_path: Path) -> None:
-    wav, segments = make_voices_wav(tmp_path / "m.wav", [(200, 2), (500, 2), (800, 0.4)])
+def test_short_segment_joins_the_closest_voice_not_the_previous_one(tmp_path: Path) -> None:
+    # A short "Sure." in voice 500 right after voice 200 speaks: it starts a new turn.
+    wav, segments = make_voices_wav(tmp_path / "m.wav", [(200, 2), (500, 2), (200, 2), (500, 0.6)])
 
     labelled = label_speakers(segments, wav, PitchEmbedder())
 
-    assert labelled[2].speaker == "Speaker 2"  # too short to compare: same as the segment before
+    assert [s.speaker for s in labelled] == ["Speaker 1", "Speaker 2", "Speaker 1", "Speaker 2"]
+
+
+def test_clip_too_short_to_fingerprint_takes_the_previous_label(tmp_path: Path) -> None:
+    wav, segments = make_voices_wav(tmp_path / "m.wav", [(200, 2), (500, 2), (800, 0.1)])
+
+    labelled = label_speakers(segments, wav, PitchEmbedder())
+
+    assert labelled[2].speaker == "Speaker 2"
 
 
 def test_cluster_merges_close_fingerprints_only() -> None:

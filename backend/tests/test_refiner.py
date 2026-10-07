@@ -249,3 +249,14 @@ def test_normal_fix_next_to_a_boundary_is_allowed() -> None:
 
     assert refined.text == "We store sessions in Redis and logs in Elasticsearch."
     assert refined.warnings == []
+
+
+def test_refining_keeps_speaker_labels() -> None:
+    transcript = Transcript(segments=[
+        Segment(start=0, end=2, text="We use cooper netties.", speaker="Speaker 1"),
+        Segment(start=2, end=4, text="Agreed.", speaker="Speaker 2"),
+    ])
+
+    refined = refine(transcript, FakeChatClient({"cooper netties.": "Kubernetes."}), model="fake")
+
+    assert [(s.speaker, s.text) for s in refined.segments] == [("Speaker 1", "We use Kubernetes."), ("Speaker 2", "Agreed.")]
