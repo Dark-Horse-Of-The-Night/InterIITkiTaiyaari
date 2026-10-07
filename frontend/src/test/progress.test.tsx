@@ -41,9 +41,8 @@ describe('JobView progress', () => {
     expect(screen.getAllByText('Done in 2.5s')).toHaveLength(1)
     expect(stageState('Refining technical terms')).toBe('running')
 
-    await nextPoll()
-    expect(stageState('Writing the meeting record')).toBe('done')
-    expect(screen.getByText(/The meeting record is ready/)).toBeInTheDocument()
+    await nextPoll() // done: progress folds into a one-line summary above the results
+    expect(screen.getByText(/Processed/)).toHaveTextContent('Processed meeting.mp3 in 2.5s')
 
     const callsWhenDone = fetchMock.mock.calls.length
     await nextPoll()
