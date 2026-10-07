@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # Long meetings are documented in parts to stay under it. Raise it on a paid plan.
     documenter_max_request_tokens: int = 7500
 
+    # Speaker labels ("Speaker 1", or a name when the recording makes it clear)
+    speaker_labels: bool = True
+    speaker_model_dir: str = str(Path(__file__).resolve().parent.parent / "data" / "models" / "spkrec-ecapa-voxceleb")
+
     # Uploads
     max_upload_mb: int = 200
     max_audio_minutes: int = 120

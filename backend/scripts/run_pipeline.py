@@ -24,7 +24,7 @@ OUTPUT_ROOT = Path(__file__).resolve().parents[2] / "scratch" / "output"
 
 
 def transcript_lines(transcript: Transcript) -> str:
-    return "\n".join(f"[{format_time(s.start)}] {s.text}" for s in transcript.segments) + "\n"
+    return "\n".join(f"[{format_time(s.start)}] {s.speaker + ': ' if s.speaker else ''}{s.text}" for s in transcript.segments) + "\n"
 
 
 def print_progress(stage: str, state: str, seconds: float | None) -> None:

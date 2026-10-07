@@ -11,6 +11,9 @@ class Segment(BaseModel):
     start: float
     end: float
     text: str
+    # Who spoke: a name if one was identified from the audio, else a label like "Speaker 2".
+    # None when speaker labelling is off or unavailable.
+    speaker: str | None = None
 
 
 class Transcript(BaseModel):
@@ -32,15 +35,27 @@ class Correction(BaseModel):
     after: str
 
 
+class SpeakerName(BaseModel):
+    """A speaker label that was given a real name, and the evidence for it."""
+
+    label: str  # e.g. "Speaker 2"
+    name: str  # e.g. "Neha"
+    how: str  # "introduced themselves" or "was addressed by name and answered"
+    quote: str  # the words that show it
+    start: float  # when the quote was said (seconds)
+
+
 class RefinedTranscript(Transcript):
     """The output of the refiner: the same segments (same timestamps) with terms corrected.
 
     `corrections` is computed by comparing old and new text, not taken from the model.
     `warnings` lists segments where an edit was rejected and the original wording kept.
+    `speaker_names` lists labels replaced by real names; other labels stay "Speaker N".
     """
 
     corrections: list[Correction] = []
     warnings: list[str] = []
+    speaker_names: list[SpeakerName] = []
 
 
 # --- Meeting record (output of the documenter) ---

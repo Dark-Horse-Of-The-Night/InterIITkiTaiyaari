@@ -96,6 +96,7 @@ export default function Results({ result, filename }: Props) {
             transcript={result.refined_transcript}
             corrections={result.refined_transcript.corrections}
             warnings={result.refined_transcript.warnings}
+            speakerNames={result.refined_transcript.speaker_names}
           />
         )}
         {tab === 'raw' && <TranscriptView transcript={result.raw_transcript} />}

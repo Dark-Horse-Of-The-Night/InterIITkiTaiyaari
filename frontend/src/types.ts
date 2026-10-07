@@ -5,6 +5,7 @@ export interface Segment {
   start: number // seconds
   end: number
   text: string
+  speaker?: string | null // a name if identified from the recording, else "Speaker 2"; absent if labels are off
 }
 
 export interface Transcript {
@@ -17,9 +18,18 @@ export interface Correction {
   after: string
 }
 
+export interface SpeakerName {
+  label: string // "Speaker 2"
+  name: string // "Neha"
+  how: string // "introduced themselves" | "was addressed by name and answered"
+  quote: string
+  start: number
+}
+
 export interface RefinedTranscript extends Transcript {
   corrections: Correction[]
   warnings: string[]
+  speaker_names?: SpeakerName[]
 }
 
 export interface Evidence {

@@ -1,26 +1,41 @@
 import type { ReactNode } from 'react'
 
 import { formatTime } from '../format'
-import type { Correction, Transcript } from '../types'
+import type { Correction, SpeakerName, Transcript } from '../types'
 
 interface Props {
   transcript: Transcript
   corrections?: Correction[] // refined transcript only: highlight what the refiner changed
   warnings?: string[]
+  speakerNames?: SpeakerName[] // refined transcript only: names identified from the recording
 }
 
-export default function TranscriptView({ transcript, corrections, warnings = [] }: Props) {
+// One colour per speaker, in order of first speaking (repeats after five).
+const SPEAKER_DOTS = ['bg-accent', 'bg-question-ink', 'bg-proposal-ink', 'bg-danger-strong', 'bg-ink-2']
+
+export default function TranscriptView({ transcript, corrections, warnings = [], speakerNames = [] }: Props) {
   const refined = corrections !== undefined
+  const speakers = [...new Set(transcript.segments.map((s) => s.speaker).filter((s): s is string => !!s))]
+  const dotFor = (speaker: string) => SPEAKER_DOTS[speakers.indexOf(speaker) % SPEAKER_DOTS.length]
   return (
     <div className="flex flex-wrap items-start gap-6">
       <section className="card min-w-0 flex-[999_1_600px] py-2" aria-label="Transcript">
         <ol>
           {transcript.segments.map((segment, i) => {
             const changes = corrections?.filter((c) => c.segment_id === i) ?? []
+            const newTurn = !!segment.speaker && segment.speaker !== transcript.segments[i - 1]?.speaker
             return (
-              <li key={i} className={`flex gap-[18px] px-6 py-2.5 leading-relaxed ${changes.length ? 'bg-accent-soft/40' : ''}`}>
+              <li key={i} className={`flex gap-[18px] px-6 py-2.5 leading-relaxed ${changes.length ? 'bg-accent-soft/40' : ''} ${newTurn && i > 0 ? 'mt-1.5' : ''}`}>
                 <span className="w-11 shrink-0 pt-0.5 font-mono text-[12.5px] text-faint">{formatTime(segment.start)}</span>
-                <span className="min-w-0 text-ink">{changes.length ? highlight(segment.text, changes) : segment.text}</span>
+                <span className="min-w-0">
+                  {newTurn && segment.speaker && (
+                    <span className="mb-0.5 flex items-center gap-1.5 text-[13px]">
+                      <span className={`size-2 rounded-full ${dotFor(segment.speaker)}`} aria-hidden />
+                      <span className={isLabel(segment.speaker) ? 'text-muted' : 'font-semibold text-ink'}>{segment.speaker}</span>
+                    </span>
+                  )}
+                  <span className="text-ink">{changes.length ? highlight(segment.text, changes) : segment.text}</span>
+                </span>
               </li>
             )
           })}
@@ -28,6 +43,42 @@ export default function TranscriptView({ transcript, corrections, warnings = [] 
       </section>
 
       <aside className="flex min-w-0 flex-[1_1_280px] flex-col gap-4">
+        {speakers.length > 0 && (
+          <section className="card p-5">
+            <h2 className="mb-1 text-[15px] font-semibold">
+              {speakers.length} speaker{speakers.length === 1 ? '' : 's'}
+            </h2>
+            <p className="mb-3 text-[13.5px] text-muted">
+              {refined
+                ? 'Named only when the recording makes it clear. Others keep a label rather than a guess.'
+                : 'Grouped by voice. Names are identified in the refined transcript.'}
+            </p>
+            <ul className="flex flex-col gap-2.5">
+              {speakers.map((speaker) => {
+                const named = speakerNames.find((n) => n.name === speaker)
+                return (
+                  <li key={speaker} className="flex gap-2.5">
+                    <span className={`mt-[7px] size-2 shrink-0 rounded-full ${dotFor(speaker)}`} aria-hidden />
+                    <div className="min-w-0 text-[13.5px]">
+                      <p className={isLabel(speaker) ? 'text-muted' : 'font-semibold'}>
+                        {speaker}
+                        {named && <span className="font-normal text-muted"> · {named.label}</span>}
+                      </p>
+                      {named ? (
+                        <p className="text-muted">
+                          {capitalise(named.how)}: <q className="italic">{named.quote}</q>{' '}
+                          <span className="font-mono text-xs">{formatTime(named.start)}</span>
+                        </p>
+                      ) : refined && isLabel(speaker) ? (
+                        <p className="text-muted">Not named in the recording</p>
+                      ) : null}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
         {refined ? (
           <>
             <section className="card p-5">
@@ -114,4 +165,12 @@ function highlight(text: string, corrections: Correction[]): ReactNode {
   })
   parts.push(text.slice(cursor))
   return parts
+}
+
+function isLabel(speaker: string): boolean {
+  return /^Speaker \d+$/.test(speaker)
+}
+
+function capitalise(text: string): string {
+  return text ? text[0].toUpperCase() + text.slice(1) : text
 }

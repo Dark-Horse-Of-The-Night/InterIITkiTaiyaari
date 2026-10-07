@@ -1,5 +1,6 @@
 """Stage 1: speech-to-text with Whisper through an OpenAI-compatible API (Groq by default)."""
 
+import logging
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
@@ -10,13 +11,15 @@ from openai import OpenAI
 
 from app.config import Settings
 from app.pipeline.api_errors import explain_api_error
-from app.pipeline.audio import prepare_chunks, validate_audio_file
+from app.pipeline.audio import FULL_WAV_NAME, prepare_chunks, validate_audio_file
 from app.pipeline.errors import STAGE_STT, PipelineError
 from app.pipeline.models import Segment, Transcript
 from app.pipeline.retry import RetriesExhausted, RetryCallback, call_with_retry, llm_timeout, stt_timeout
 
 # Called with progress details like "Part 2 of 6".
 DetailCallback = Callable[[str], None]
+
+logger = logging.getLogger("app.pipeline.stt")
 
 
 def make_stt_client(settings: Settings) -> OpenAI:
@@ -37,13 +40,15 @@ def transcribe_file(
     on_retry: RetryCallback | None = None,
     max_audio_minutes: int | None = None,
     on_detail: DetailCallback | None = None,
+    speaker_embedder: Any = None,
 ) -> Transcript:
-    """Full stage 1: check the upload, convert and split it, and transcribe each part in order."""
+    """Full stage 1: check the upload, convert and split it, transcribe each part in order,
+    then (if a speaker model is available) label who spoke each segment."""
     duration = validate_audio_file(upload_path, max_upload_mb, max_audio_minutes)
     with tempfile.TemporaryDirectory() as work_dir:
         if on_detail:
             on_detail("Preparing the audio")
-        chunks = prepare_chunks(upload_path, duration, Path(work_dir))
+        chunks = prepare_chunks(upload_path, duration, Path(work_dir), keep_wav=speaker_embedder is not None)
         segments: list[Segment] = []
         for number, chunk in enumerate(chunks, start=1):
             if on_detail and len(chunks) > 1:
@@ -53,6 +58,10 @@ def transcribe_file(
             segments += [
                 Segment(start=s.start + chunk.start, end=s.end + chunk.start, text=s.text) for s in part.segments
             ]
+        if speaker_embedder is not None and segments:
+            if on_detail:
+                on_detail("Identifying who is speaking")
+            segments = _label_speakers(segments, Path(work_dir) / FULL_WAV_NAME, speaker_embedder)
     if not segments:
         raise PipelineError(
             STAGE_STT,
@@ -108,3 +117,14 @@ def transcribe(
             "Check that the recording contains people talking and is not silent.",
         )
     return Transcript(segments=segments)
+
+
+def _label_speakers(segments: list[Segment], wav_path: Path, embedder: Any) -> list[Segment]:
+    """Speaker labels are a bonus: if labelling fails, keep the transcript without them."""
+    from app.pipeline.speakers import label_speakers
+
+    try:
+        return label_speakers(segments, wav_path, embedder)
+    except Exception:
+        logger.exception("Speaker labelling failed; continuing without speaker labels")
+        return segments

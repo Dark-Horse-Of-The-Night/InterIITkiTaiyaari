@@ -1,0 +1,7 @@
+# Optional: speaker labels ("Speaker 1", or a name when the recording makes it clear).
+# Without these, everything works; transcripts just have no speaker labels.
+# The voice model (~90 MB) downloads once from Hugging Face into backend/data/models/.
+numpy>=2
+torch>=2.4
+torchaudio>=2.4
+speechbrain>=1.0

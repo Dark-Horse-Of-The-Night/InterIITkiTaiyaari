@@ -16,7 +16,7 @@ export function formatSeconds(seconds: number): string {
 
 /** A transcript as plain text, one "[mm:ss] text" line per segment. */
 export function transcriptToText(transcript: Transcript): string {
-  return transcript.segments.map((s) => `[${formatTime(s.start)}] ${s.text}`).join('\n') + '\n'
+  return transcript.segments.map((s) => `[${formatTime(s.start)}] ${s.speaker ? `${s.speaker}: ` : ''}${s.text}`).join('\n') + '\n'
 }
 
 /** "Team Sync.final.mp3" -> "Team Sync.final" */

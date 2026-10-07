@@ -140,7 +140,8 @@ def format_lines(segments: list[Segment], first: int, end: int) -> str:
 
 
 def format_line(index: int, segment: Segment) -> str:
-    return f"[{index}] ({format_time(segment.start)}) {segment.text}"
+    speaker = f"{segment.speaker}: " if segment.speaker else ""
+    return f"[{index}] ({format_time(segment.start)}) {speaker}{segment.text}"
 
 
 def record_json_schema() -> dict[str, Any]:
@@ -213,8 +214,8 @@ def _check_name(name: str | None, context: str, field: str, label: str, warnings
     if name is None:
         return None
     words = normalize(name).split()
-    if not words or " ".join(words) in NOT_A_NAME:
-        return None  # "I", "we", "someone"... are not names; no warning needed
+    if not words or " ".join(words) in NOT_A_NAME or re.fullmatch(r"speaker \d+", " ".join(words)):
+        return None  # "I", "we", "someone", "Speaker 2"... are not names; no warning needed
     context_words = set(context.split())
     if all(word in context_words for word in words):
         return name
@@ -234,10 +235,11 @@ def _check_phrase(phrase: str | None, context: str, field: str, label: str, warn
 
 
 def _context_text(segment_ids: list[int], segments: list[Segment]) -> str:
-    """Normalized text of the cited segments plus a few around them."""
+    """Normalized text of the cited segments plus a few around them, including who spoke them
+    (a speaker identified by name counts as stated, so "I'll do it" by Neha can be Neha's)."""
     first = max(min(segment_ids) - CONTEXT_BEFORE, 0)
     last = min(max(segment_ids) + CONTEXT_AFTER, len(segments) - 1)
-    return " ".join(normalize(seg.text) for seg in segments[first : last + 1])
+    return " ".join(normalize(f"{seg.speaker or ''} {seg.text}") for seg in segments[first : last + 1])
 
 
 def locate_quote(quote: str, segments: list[Segment], preferred_ids: list[int]) -> list[int] | None:

@@ -112,9 +112,15 @@ def probe_audio_duration(path: Path) -> float | None:
     return duration if has_audio and duration > 0 else None
 
 
-def prepare_chunks(path: Path, duration: float, output_dir: Path) -> list[AudioChunk]:
-    """Convert the recording and split it into parts of about 5 minutes (one part if it's short)."""
-    wav_path = output_dir / "full_16k_mono.wav"
+FULL_WAV_NAME = "full_16k_mono.wav"
+
+
+def prepare_chunks(path: Path, duration: float, output_dir: Path, keep_wav: bool = False) -> list[AudioChunk]:
+    """Convert the recording and split it into parts of about 5 minutes (one part if it's short).
+
+    With `keep_wav`, the full 16 kHz mono WAV stays at output_dir / FULL_WAV_NAME (for speaker labels).
+    """
+    wav_path = output_dir / FULL_WAV_NAME
     _convert(["-i", str(path), "-vn", "-ac", "1", "-ar", "16000", "-sample_fmt", "s16", str(wav_path)])
 
     silences = find_silences(wav_path) if duration > CHUNK_SECONDS * 1.1 else []
@@ -129,7 +135,8 @@ def prepare_chunks(path: Path, duration: float, output_dir: Path) -> list[AudioC
         ])
         _check_part_size(chunk_path)
         chunks.append(AudioChunk(path=chunk_path, start=start, end=end))
-    wav_path.unlink(missing_ok=True)
+    if not keep_wav:
+        wav_path.unlink(missing_ok=True)
     return chunks
 
 

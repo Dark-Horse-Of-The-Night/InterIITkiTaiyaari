@@ -103,3 +103,39 @@ describe('Downloads', () => {
     expect(await saved[0].blob.text()).toContain('[00:04] Arjun proposed switching our CICD pipeline')
   })
 })
+
+describe('Speakers', () => {
+  function withSpeakers() {
+    const result = makeResult()
+    const raw = ['Speaker 1', 'Speaker 2', 'Speaker 1']
+    const refined = ['Speaker 1', 'Arjun', 'Speaker 1']
+    result.raw_transcript.segments = result.raw_transcript.segments.map((s, i) => ({ ...s, speaker: raw[i] }))
+    result.refined_transcript.segments = result.refined_transcript.segments.map((s, i) => ({ ...s, speaker: refined[i] }))
+    result.refined_transcript.speaker_names = [
+      { label: 'Speaker 2', name: 'Arjun', how: 'introduced themselves', quote: "I'm Arjun", start: 4 },
+    ]
+    return result
+  }
+
+  it('shows names where identified, with the evidence, and labels otherwise', async () => {
+    renderResults(withSpeakers())
+    await userEvent.click(screen.getByRole('tab', { name: /Refined transcript/ }))
+
+    expect(screen.getByText('2 speakers')).toBeInTheDocument()
+    expect(screen.getAllByText('Arjun').length).toBeGreaterThan(0)
+    expect(screen.getByText("I'm Arjun")).toBeInTheDocument()
+    expect(screen.getByText(/Introduced themselves/)).toBeInTheDocument()
+    expect(screen.getByText('Not named in the recording')).toBeInTheDocument()
+  })
+
+  it('shows voice labels in the raw transcript and exports speakers in the text file', async () => {
+    renderResults(withSpeakers())
+    await userEvent.click(screen.getByRole('tab', { name: 'Raw transcript' }))
+
+    expect(screen.getAllByText('Speaker 2').length).toBeGreaterThan(0)
+    expect(screen.getByText(/Names are identified in the refined transcript/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Raw .txt' }))
+    expect(await saved[0].blob.text()).toContain('[00:04] Speaker 2: Arjun proposed')
+  })
+})

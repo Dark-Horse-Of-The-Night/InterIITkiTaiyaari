@@ -17,6 +17,8 @@ from app.pipeline.documenter import document, make_documenter_client
 from app.pipeline.errors import STAGE_DOCUMENTER, STAGE_REFINER, STAGE_STT
 from app.pipeline.models import MeetingRecord, RefinedTranscript, Transcript
 from app.pipeline.refiner import make_refiner_client, refine
+from app.pipeline.speaker_names import name_speakers
+from app.pipeline.speakers import load_embedder
 from app.pipeline.render import record_to_markdown
 from app.pipeline.stt import make_stt_client, transcribe_file
 
@@ -39,6 +41,7 @@ class PipelineClients:
     stt: Any
     refiner: Any
     documenter: Any
+    speakers: Any = None  # voice model for speaker labels (None = no labels)
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "PipelineClients":
@@ -46,6 +49,7 @@ class PipelineClients:
             stt=make_stt_client(settings),
             refiner=make_refiner_client(settings),
             documenter=make_documenter_client(settings),
+            speakers=load_embedder(settings.speaker_model_dir) if settings.speaker_labels else None,
         )
 
 
@@ -92,15 +96,24 @@ def run_pipeline(
         STAGE_STT,
         lambda: transcribe_file(
             audio_path, clients.stt, settings.stt_model, settings.max_upload_mb, notes_for(STAGE_STT),
-            settings.max_audio_minutes, details_for(STAGE_STT),
+            settings.max_audio_minutes, details_for(STAGE_STT), clients.speakers,
         ),
     )
-    refined = run_stage(
-        STAGE_REFINER,
-        lambda: refine(
+    def refine_stage() -> RefinedTranscript:
+        refined = refine(
             raw, clients.refiner, settings.refiner_model, glossary, notes_for(STAGE_REFINER), details_for(STAGE_REFINER)
-        ),
-    )
+        )
+        if not any(segment.speaker for segment in refined.segments):
+            return refined
+        if on_detail:
+            on_detail(STAGE_REFINER, "Identifying speaker names")
+        segments, names, warnings = name_speakers(
+            refined.segments, clients.refiner, settings.refiner_model,
+            settings.documenter_max_request_tokens, notes_for(STAGE_REFINER),
+        )
+        return refined.model_copy(update={"segments": segments, "speaker_names": names, "warnings": refined.warnings + warnings})
+
+    refined = run_stage(STAGE_REFINER, refine_stage)
     record = run_stage(
         STAGE_DOCUMENTER,
         lambda: document(
