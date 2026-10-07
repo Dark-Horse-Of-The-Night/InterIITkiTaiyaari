@@ -1,0 +1,82 @@
+import { useEffect, useState } from 'react'
+
+import type { StageProgress, StageState } from '../types'
+
+// Friendlier names for the backend's stage names.
+const LABELS: Record<string, string> = {
+  'Speech-to-text': 'Transcribing the audio',
+  Refiner: 'Refining technical terms',
+  Documenter: 'Writing the meeting record',
+}
+
+interface Props {
+  stages: StageProgress[]
+  active: boolean // true while processing; drives the elapsed-time counter
+}
+
+export default function ProgressSteps({ stages, active }: Props) {
+  const elapsed = useElapsedSeconds(active)
+
+  return (
+    <div>
+      <ol className="space-y-3">
+        {stages.map((stage) => (
+          <li
+            key={stage.name}
+            data-state={stage.state}
+            className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900"
+          >
+            <StateIcon state={stage.state} />
+            <span className={`flex-1 text-sm ${stage.state === 'pending' ? 'text-slate-400 dark:text-slate-500' : 'font-medium text-slate-800 dark:text-slate-100'}`}>
+              {LABELS[stage.name] ?? stage.name}
+            </span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{describe(stage)}</span>
+          </li>
+        ))}
+      </ol>
+      {active && (
+        <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
+          {elapsed}s elapsed · longer recordings can take a minute or two
+        </p>
+      )}
+    </div>
+  )
+}
+
+function describe(stage: StageProgress): string {
+  switch (stage.state) {
+    case 'pending':
+      return 'Waiting'
+    case 'running':
+      return 'Running…'
+    case 'done':
+      return stage.seconds !== null ? `Done in ${stage.seconds}s` : 'Done'
+    case 'failed':
+      return 'Failed'
+  }
+}
+
+function StateIcon({ state }: { state: StageState }) {
+  const base = 'flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold'
+  switch (state) {
+    case 'pending':
+      return <span aria-hidden className={`${base} border-2 border-slate-300 dark:border-slate-600`} />
+    case 'running':
+      return <span aria-hidden className={`${base} animate-spin border-2 border-indigo-200 border-t-indigo-600 dark:border-indigo-900 dark:border-t-indigo-400`} />
+    case 'done':
+      return <span aria-hidden className={`${base} bg-emerald-600 text-white`}>✓</span>
+    case 'failed':
+      return <span aria-hidden className={`${base} bg-red-600 text-white`}>✕</span>
+  }
+}
+
+function useElapsedSeconds(active: boolean): number {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!active) return
+    const started = Date.now()
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [active])
+  return elapsed
+}
