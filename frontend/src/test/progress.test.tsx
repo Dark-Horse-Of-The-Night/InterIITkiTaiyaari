@@ -32,18 +32,18 @@ describe('JobView progress', () => {
       makeJob('done', ['done', 'done', 'done'], { result: makeResult() }),
     )
     render(<JobView initialJob={queued} onReset={() => {}} />)
-    expect(stageState('Transcribing the audio')).toBe('pending')
+    expect(stageState('Listening')).toBe('pending')
 
     await nextPoll()
-    expect(stageState('Transcribing the audio')).toBe('running')
+    expect(stageState('Listening')).toBe('running')
 
     await nextPoll()
-    expect(stageState('Transcribing the audio')).toBe('done')
+    expect(stageState('Listening')).toBe('done')
     expect(screen.getAllByText('Done in 2.5s')).toHaveLength(1)
-    expect(stageState('Refining technical terms')).toBe('running')
+    expect(stageState('Fixing jargon')).toBe('running')
 
     await nextPoll() // done: progress folds into a one-line summary above the results
-    expect(screen.getByText('Processed in 2.5s')).toBeInTheDocument()
+    expect(screen.getByText(/Processed in 2\.5s/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Meeting') // title from meeting.mp3
 
     const callsWhenDone = fetchMock.mock.calls.length
@@ -59,7 +59,7 @@ describe('JobView progress', () => {
 
     await nextPoll()
 
-    expect(stageState('Refining technical terms')).toBe('failed')
+    expect(stageState('Fixing jargon')).toBe('failed')
     expect(screen.getByRole('alert')).toHaveTextContent('Stage: Refiner')
     expect(screen.getByRole('alert')).toHaveTextContent('Check REFINER_API_KEY')
     await nextPoll()
@@ -83,7 +83,7 @@ describe('JobView progress', () => {
     await nextPoll() // recovers
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(stageState('Transcribing the audio')).toBe('running')
+    expect(stageState('Listening')).toBe('running')
   })
 
   it('gives up after repeated network failures', async () => {
@@ -134,5 +134,32 @@ describe('JobView progress', () => {
 
     await nextPoll()
     expect(screen.getByText(hint)).toBeInTheDocument()
+  })
+
+  it('says what is happening in the headline', async () => {
+    fakeFetch(makeJob('running', ['done', 'running', 'pending']))
+    render(<JobView initialJob={queued} onReset={() => {}} />)
+
+    await nextPoll()
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fixing the jargon…')
+  })
+
+  it('shows the live fix-it card as soon as corrections arrive', async () => {
+    const job = makeJob('running', ['done', 'done', 'running'], {
+      preview: [
+        { before: 'ONYX', after: 'ONNX', sentence: "I'll export the model to ONNX." },
+        { before: 'Atom', after: 'Adam', sentence: 'I used the Adam optimizer.' },
+      ],
+    })
+    fakeFetch(job)
+    render(<JobView initialJob={queued} onReset={() => {}} />)
+
+    await nextPoll()
+
+    expect(screen.getByRole('heading', { name: 'We fixed 2 misheard terms' })).toBeInTheDocument()
+    expect(screen.getByText('ONYX')).toHaveClass('strike-out')
+    expect(screen.getByText('ONNX')).toBeInTheDocument()
+    expect(screen.getByText("I'll export the model to ONNX.")).toBeInTheDocument()
   })
 })

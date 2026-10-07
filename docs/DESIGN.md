@@ -134,7 +134,8 @@ Before this change, a hung service could leave the app spinning for ~15 minutes 
 - **Upload → job → poll.** `POST /api/meetings` checks the file immediately (bad files fail in under a second) and returns a job id; processing runs in the background; the frontend polls once a second and shows each stage's state, "Part N of M", retry notes and timings.
 - **Upload limits** are enforced twice: from `Content-Length` before the body is read, and by counting bytes while saving. Temporary files are always deleted.
 - **Downloads** are generated in the browser from data already received; the server stores nothing.
-- **Frontend** is React + Vite + TypeScript with Tailwind CSS, designed first as mockups (the "Ledger" look: Geist type, one teal accent, evidence quotes with timestamp chips, Unspecified as a visible dashed tag). It follows the system's light or dark mode and works at phone width. Speakers appear at the start of each turn, with a sidebar explaining how each name was identified.
+- **Frontend** is React + Vite + TypeScript with Tailwind CSS, designed page by page as mockups, with each page approved before building. The look is light orange on white with Bricolage Grotesque headlines and a faded sound-wave background. Colours were chosen for contrast: dark text on the light orange buttons (7.4:1), and a deeper orange for text on white (5.8:1).
+- **Interactive pieces:** sample meetings served by the backend; a live fix-it card fed by the job's `preview` (the refiner's corrections, shared before the documenter finishes); an audio player that plays the uploaded file from the browser, with a waveform decoded in the browser (average loudness per slice) and click-to-play on every to-do, quote and transcript line; karaoke-style highlighting of the line being played. Animations are CSS only (no extra library) and switch off under "reduce motion".
 
 ## Evaluation
 

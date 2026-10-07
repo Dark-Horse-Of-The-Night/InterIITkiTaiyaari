@@ -52,9 +52,16 @@ export function makeResult(): MeetingResult {
   }
 }
 
-/** Replace fetch with a fake that returns the given replies in order (objects -> 200 JSON). */
+/** Replace fetch with a fake that returns the given replies in order (objects -> 200 JSON).
+ *  Requests for the sample list get `samples` (empty by default) and don't use up a reply. */
 export function fakeFetch(...replies: Array<object | Response | Error>) {
-  const fetchMock = vi.fn(async () => {
+  return fakeFetchWithSamples([], ...replies)
+}
+
+export function fakeFetchWithSamples(samples: object[], ...replies: Array<object | Response | Error>) {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url) === '/api/samples') return new Response(JSON.stringify(samples), { status: 200 })
+    if (String(url).startsWith('/api/samples/')) return new Response(new Uint8Array(2000), { status: 200, headers: { 'content-type': 'audio/mp4' } })
     const reply = replies.length > 1 ? replies.shift()! : replies[0] // last reply repeats
     if (reply instanceof Error) throw reply
     if (reply instanceof Response) return reply.clone()
@@ -62,6 +69,11 @@ export function fakeFetch(...replies: Array<object | Response | Error>) {
   })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
+}
+
+/** The fetch calls that weren't for the sample list. */
+export function apiCalls(fetchMock: ReturnType<typeof fakeFetch>) {
+  return fetchMock.mock.calls.filter(([url]) => !String(url).startsWith('/api/samples'))
 }
 
 export function errorResponse(status: number, stage: string | null, message: string, fix: string | null): Response {

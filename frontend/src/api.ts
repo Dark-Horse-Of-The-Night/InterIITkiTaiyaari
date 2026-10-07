@@ -1,6 +1,6 @@
 // Calls to the FastAPI backend. Vite's dev proxy forwards /api to http://localhost:8000.
 
-import type { Job, JobError } from './types'
+import type { Job, JobError, Sample } from './types'
 
 /** A failed API call, carrying the backend's plain-English error. */
 export class ApiError extends Error {
@@ -31,6 +31,23 @@ export function uploadMeeting(file: File, glossary: string): Promise<Job> {
 /** Get a job's progress, and its result once finished. */
 export function getJob(jobId: string): Promise<Job> {
   return request<Job>(`/api/meetings/${encodeURIComponent(jobId)}`)
+}
+
+/** The sample recordings offered on the upload page. */
+export function listSamples(): Promise<Sample[]> {
+  return request<Sample[]>('/api/samples')
+}
+
+/** Download a sample's audio as a File, so it can be uploaded (and played) like the user's own. */
+export async function fetchSample(sample: Sample): Promise<File> {
+  let response: Response
+  try {
+    response = await fetch(`/api/samples/${encodeURIComponent(sample.id)}/audio`)
+  } catch {
+    throw new ApiError(SERVER_UNREACHABLE, 0)
+  }
+  if (!response.ok) throw new ApiError({ stage: null, message: 'That sample recording could not be loaded.', fix: 'Try another sample.' }, response.status)
+  return new File([await response.blob()], sample.filename, { type: response.headers.get('content-type') ?? 'audio/mp4' })
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {

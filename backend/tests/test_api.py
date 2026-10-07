@@ -252,3 +252,31 @@ def test_progress_detail_and_quiet_time(setup: Setup, monkeypatch: pytest.Monkey
     setup.jobs.update_stage(job.job_id, "Speech-to-text", "done", 40.0)
     assert stt()["seconds_since_update"] is None
     assert stt()["detail"] is None
+
+
+def test_corrections_are_shared_before_the_job_finishes(setup: Setup) -> None:
+    setup.clients.refiner = FakeRefinerClient({"switching": "moving"})  # any one-word change works here
+    seen: list[Any] = []
+    real_set_preview = setup.jobs.set_preview
+
+    def watch(job_id: str, refined: Any) -> None:
+        real_set_preview(job_id, refined)
+        seen.append(setup.jobs.get(job_id))
+
+    setup.jobs.set_preview = watch  # type: ignore[method-assign]
+    job_id = setup.upload(setup.wav()).json()["job_id"]
+    job = setup.client.get(f"/api/meetings/{job_id}").json()
+
+    assert seen and seen[0].status == "running" and seen[0].result is None  # shared while still running
+    assert job["preview"] == [{"before": "switching", "after": "moving",
+                               "sentence": "Arjun proposed moving our CI/CD pipeline to GitHub Actions,"}]
+
+
+def test_samples_are_listed_and_served(setup: Setup) -> None:
+    samples = setup.client.get("/api/samples").json()
+
+    assert {s["id"] for s in samples} >= {"technical_meeting", "meeting"}
+    assert all(s["seconds"] > 0 for s in samples)
+    audio = setup.client.get("/api/samples/meeting/audio")
+    assert audio.status_code == 200 and len(audio.content) > 1000
+    assert setup.client.get("/api/samples/nope/audio").status_code == 404

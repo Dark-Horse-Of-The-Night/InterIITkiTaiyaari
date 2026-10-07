@@ -11,6 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
 
+from app.pipeline.models import RefinedTranscript
 from app.pipeline.run import STAGES, MeetingResult
 
 JOB_TTL_SECONDS = 60 * 60
@@ -33,6 +34,14 @@ class StageProgress(BaseModel):
         return round(time.time() - self.updated_at, 1)
 
 
+class PreviewCorrection(BaseModel):
+    """A fix shown while the record is still being written: "ONYX" -> "ONNX" in "...export the model to ONNX..."."""
+
+    before: str
+    after: str
+    sentence: str  # the corrected segment, for context
+
+
 class JobError(BaseModel):
     """A failure shown to the user: which stage, what happened, what to do."""
 
@@ -46,6 +55,7 @@ class Job(BaseModel):
     filename: str
     status: Literal["queued", "running", "done", "failed"] = "queued"
     stages: list[StageProgress]
+    preview: list[PreviewCorrection] | None = None  # corrections, available once the refiner is done
     result: MeetingResult | None = None
     error: JobError | None = None
     finished_at: float | None = None
@@ -89,6 +99,16 @@ class JobStore:
                 if progress.name == stage:
                     progress.note = note
                     progress.updated_at = time.time()
+
+    def set_preview(self, job_id: str, refined: RefinedTranscript) -> None:
+        """Share the refiner's corrections before the whole job finishes (for the live fix-it view)."""
+        preview = [
+            PreviewCorrection(before=c.before, after=c.after, sentence=refined.segments[c.segment_id].text)
+            for c in refined.corrections
+            if 0 <= c.segment_id < len(refined.segments)
+        ]
+        with self._lock:
+            self._jobs[job_id].preview = preview
 
     def set_detail(self, job_id: str, stage: str, detail: str) -> None:
         """Show where a long stage has got to, e.g. "Part 2 of 6". Clears any old retry note."""

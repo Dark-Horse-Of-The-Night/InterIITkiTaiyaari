@@ -46,7 +46,11 @@ More detail on design decisions, measurements and evaluation: **[docs/DESIGN.md]
 | **Meeting record** | Summary · minutes by topic · key decisions · action items (task, owner, deadline) · open proposals and questions. Every item shows its timestamp and supporting quote |
 | **Downloads** | `record.md`, `record.json`, `refined-transcript.txt`, `raw-transcript.txt`. The Markdown and JSON are generated from the same data |
 
-While processing, the app shows live progress for each stage ("Part 3 of 8", "Batch 5 of 11"), any retries, and a clear message if something fails: which stage, what happened, and what to do.
+**The interface** (designed page by page as mockups first: bright, simple and playful):
+- **Upload:** a big drop zone with a swaying sound-bar mascot, optional "words we should know", and one-click sample meetings.
+- **Processing:** the current step in plain words ("Fixing the jargon…"), step pills, part-by-part progress, retry notes, and a **live fix-it card**: as soon as the refiner finishes, each misheard word is struck through and the right term pops in, while the record is still being written.
+- **Results:** an **audio player** with the recording's real waveform. Click any to-do, quote or transcript line to hear that moment, and the transcript highlights the line being played (karaoke style). It also has quick stats, to-do cards with owner and deadline chips ("Needs an owner" instead of a guess), and the transcript as chat bubbles per speaker with fixes highlighted.
+- All motion respects the system's "reduce motion" setting. Errors always say which stage failed, what happened and what to do.
 
 ## Quick start
 
@@ -88,7 +92,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Open <http://localhost:5173> (a calm "ledger" look, light and dark mode), drop in a recording (`.mp3 .wav .m4a .flac .ogg .webm .mp4 .mpeg .mpga`, up to 200 MB / 120 minutes), optionally list terms used in the meeting (e.g. `Zephyr, KubeFlow`), and click **Process recording**.
+Open <http://localhost:5173>, drop in a recording (or click one of the **"Try one of ours"** samples) (`.mp3 .wav .m4a .flac .ogg .webm .mp4 .mpeg .mpga`, up to 200 MB / 120 minutes), optionally list terms used in the meeting (e.g. `Zephyr, KubeFlow`), and click **Process recording**.
 
 A short meeting takes about 10–15 seconds. Try one of the [samples](#samples) first.
 
@@ -116,7 +120,8 @@ All providers are called through the **OpenAI Python SDK** using `base_url`, so 
 | Endpoint | Purpose |
 |---|---|
 | `POST /api/meetings` | Upload (`file`, optional `glossary`). Bad files are rejected immediately with a specific message; good ones return `202` with a `job_id` |
-| `GET /api/meetings/{job_id}` | Progress of each stage, then the full result: transcripts, corrections, record JSON, Markdown, models used, timings |
+| `GET /api/meetings/{job_id}` | Progress of each stage, the refiner's corrections as soon as they exist (`preview`), then the full result: transcripts, corrections, record JSON, Markdown, models used, timings |
+| `GET /api/samples`, `GET /api/samples/{id}/audio` | The sample meetings offered on the upload page |
 | `GET /health` | Server status and configured models |
 
 Errors always have the same shape: `{"error": {"stage", "message", "fix"}}`.
@@ -164,8 +169,8 @@ Rough timings on the free tier: short meeting 10–15 s; 13-minute meeting ~5 mi
 ## Testing
 
 ```bash
-cd backend && .venv/bin/pytest          # 168 tests
-cd frontend && npm test                 # 27 tests
+cd backend && .venv/bin/pytest          # 173 tests
+cd frontend && npm test                 # 35 tests
 cd frontend && npm run build && npm run lint
 ```
 

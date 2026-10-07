@@ -19,11 +19,11 @@ from typing import Annotated, Any
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.config import ConfigError, Settings, get_settings
 from app.jobs import Job, JobError, JobStore
-from app.pipeline.audio import BYTES_PER_MB, validate_audio_file
+from app.pipeline.audio import BYTES_PER_MB, probe_audio_duration, validate_audio_file
 from app.pipeline.errors import STAGE_FILE_CHECK, PipelineError
 from app.pipeline.run import PipelineClients, run_pipeline
 
@@ -185,6 +185,35 @@ def get_meeting(job_id: str, jobs: Annotated[JobStore, Depends(get_job_store)]) 
     return job
 
 
+# Sample recordings for the "Try one of ours" buttons (files in the repo's samples/ folder).
+SAMPLES_DIR = Path(__file__).resolve().parents[2] / "samples"
+SAMPLES = {
+    "technical_meeting": ("Model review", "recording.m4a"),
+    "speakers_meeting": ("Release sync", "recording.m4a"),
+    "meeting": ("Sprint planning", "recording.mp3"),
+}
+
+
+@app.get("/api/samples")
+def list_samples() -> list[dict[str, object]]:
+    """Sample meetings that exist on disk, with their length in seconds."""
+    samples = []
+    for sample_id, (title, filename) in SAMPLES.items():
+        path = SAMPLES_DIR / sample_id / filename
+        if path.is_file():
+            samples.append({"id": sample_id, "title": title, "filename": f"{title.lower().replace(' ', '-')}{path.suffix}",
+                            "seconds": round(probe_audio_duration(path) or 0)})
+    return samples
+
+
+@app.get("/api/samples/{sample_id}/audio", response_model=None)
+def sample_audio(sample_id: str) -> FileResponse | JSONResponse:
+    """The audio file of one sample (the browser then uploads it like any other recording)."""
+    if sample_id not in SAMPLES or not (SAMPLES_DIR / sample_id / SAMPLES[sample_id][1]).is_file():
+        return error_response(404, JobError(stage=None, message="That sample recording was not found.", fix="Choose another sample."))
+    return FileResponse(SAMPLES_DIR / sample_id / SAMPLES[sample_id][1])
+
+
 # --- Helpers ---
 
 
@@ -199,6 +228,7 @@ def process_meeting(
             on_progress=lambda stage, state, seconds: jobs.update_stage(job_id, stage, state, seconds),
             on_note=lambda stage, note: jobs.set_note(job_id, stage, note),
             on_detail=lambda stage, detail: jobs.set_detail(job_id, stage, detail),
+            on_refined=lambda refined: jobs.set_preview(job_id, refined),
         )
         jobs.finish(job_id, result)
     except PipelineError as error:

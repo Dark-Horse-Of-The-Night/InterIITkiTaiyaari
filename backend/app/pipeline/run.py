@@ -72,8 +72,13 @@ def run_pipeline(
     on_progress: ProgressCallback | None = None,
     on_note: NoteCallback | None = None,
     on_detail: DetailCallback | None = None,
+    on_refined: Callable[[RefinedTranscript], None] | None = None,
 ) -> MeetingResult:
-    """Run all three stages on one audio file. Raises PipelineError if a stage fails."""
+    """Run all three stages on one audio file. Raises PipelineError if a stage fails.
+
+    `on_refined` receives the refined transcript as soon as stage 2 finishes, so the app can
+    show the corrections while the documenter is still working.
+    """
     timings: dict[str, float] = {}
 
     def notes_for(stage: str) -> Callable[[str], None] | None:
@@ -114,6 +119,8 @@ def run_pipeline(
         return refined.model_copy(update={"segments": segments, "speaker_names": names, "warnings": refined.warnings + warnings})
 
     refined = run_stage(STAGE_REFINER, refine_stage)
+    if on_refined:
+        on_refined(refined)
     record = run_stage(
         STAGE_DOCUMENTER,
         lambda: document(

@@ -99,11 +99,27 @@ export interface JobError {
   fix: string | null
 }
 
+/** A correction shared as soon as the refiner finishes (for the live fix-it view). */
+export interface PreviewCorrection {
+  before: string
+  after: string
+  sentence: string
+}
+
 export interface Job {
   job_id: string
   filename: string
   status: 'queued' | 'running' | 'done' | 'failed'
   stages: StageProgress[]
+  preview?: PreviewCorrection[] | null
   result: MeetingResult | null
   error: JobError | null
+}
+
+/** A sample recording the app can try ("Try one of ours"). */
+export interface Sample {
+  id: string
+  title: string
+  filename: string
+  seconds: number
 }

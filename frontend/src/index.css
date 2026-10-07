@@ -1,137 +1,126 @@
 @import "tailwindcss";
 
 /*
-  "Ledger" design tokens. Components use these names (bg-surface, text-muted, bg-accent…)
-  so light and dark mode are handled here, in one place.
+  "Playful" design tokens. A light orange with dark text on it
+  (7.4:1 contrast), a darker orange for text on white (5.8:1), and a few friendly chip colours.
 */
-:root {
-  --ground: #f4f5f7;
-  --surface: #ffffff;
-  --surface-2: #f6f7f9;
-  --subtle: #f0f2f5;
-  --line: #e3e6ea;
-  --line-soft: #eef0f3;
-  --line-strong: #c9ced6;
-  --ink: #14171c;
-  --ink-2: #3a404a;
-  --muted: #5b6370;
-  --faint: #6b7280;
+@theme {
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Figtree", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
 
-  --accent: #0e7c6b;
-  --accent-hover: #0b6a5b;
-  --on-accent: #ffffff;
-  --accent-soft: #e6f4f1;
-  --accent-ink: #0b5d51;
-  --mark: #d3eee8;
-  --mark-ink: #08453c;
+  --color-ground: #ffffff;
+  --color-ink: #241a14;
+  --color-ink-2: #3d2f27;
+  --color-muted: #6e5f57;
+  --color-faint: #8a7b73;
+  --color-line: #f5dfd0;
+  --color-line-strong: #e9cdb9;
 
-  --warn-soft: #fff4e5;
-  --warn-line: #f3ddbf;
-  --warn-ink: #6e3c00;
-  --proposal-soft: #fff1de;
-  --proposal-ink: #8a4b00;
-  --question-soft: #e8f1fb;
-  --question-ink: #1d4e89;
-  --danger-soft: #fef3f2;
-  --danger-line: #f6d0cc;
-  --danger-ink: #7a1c14;
-  --danger-strong: #9f1e14;
-}
+  --color-orange: #ff8a3d; /* fills: buttons, bars (with dark text) */
+  --color-orange-bright: #ffa260; /* decorative bars */
+  --color-orange-deep: #e06a1c; /* button "3D" edge */
+  --color-orange-ink: #a84a0c; /* orange text on white */
+  --color-orange-soft: #fff4eb;
+  --color-orange-track: #ffe3cc;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #0e1013;
-    --surface: #16191e;
-    --surface-2: #1c2026;
-    --subtle: #232830;
-    --line: #2a2f37;
-    --line-soft: #22262d;
-    --line-strong: #3a414b;
-    --ink: #e9ecef;
-    --ink-2: #c9ced6;
-    --muted: #9aa3ae;
-    --faint: #8a929e;
-
-    --accent: #2bb39c;
-    --accent-hover: #3cc4ad;
-    --on-accent: #05140f;
-    --accent-soft: rgba(43, 179, 156, 0.14);
-    --accent-ink: #7fdcca;
-    --mark: rgba(43, 179, 156, 0.28);
-    --mark-ink: #d4f6ee;
-
-    --warn-soft: rgba(245, 166, 35, 0.12);
-    --warn-line: rgba(245, 166, 35, 0.3);
-    --warn-ink: #f5c27a;
-    --proposal-soft: rgba(245, 166, 35, 0.14);
-    --proposal-ink: #f5c27a;
-    --question-soft: rgba(96, 165, 250, 0.14);
-    --question-ink: #a5cbf6;
-    --danger-soft: rgba(240, 82, 82, 0.1);
-    --danger-line: rgba(240, 82, 82, 0.32);
-    --danger-ink: #f4aaa3;
-    --danger-strong: #f28b82;
-  }
-}
-
-@theme inline {
-  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "SF Mono", monospace;
-
-  --color-ground: var(--ground);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-subtle: var(--subtle);
-  --color-line: var(--line);
-  --color-line-soft: var(--line-soft);
-  --color-line-strong: var(--line-strong);
-  --color-ink: var(--ink);
-  --color-ink-2: var(--ink-2);
-  --color-muted: var(--muted);
-  --color-faint: var(--faint);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-on-accent: var(--on-accent);
-  --color-accent-soft: var(--accent-soft);
-  --color-accent-ink: var(--accent-ink);
-  --color-mark: var(--mark);
-  --color-mark-ink: var(--mark-ink);
-  --color-warn-soft: var(--warn-soft);
-  --color-warn-line: var(--warn-line);
-  --color-warn-ink: var(--warn-ink);
-  --color-proposal-soft: var(--proposal-soft);
-  --color-proposal-ink: var(--proposal-ink);
-  --color-question-soft: var(--question-soft);
-  --color-question-ink: var(--question-ink);
-  --color-danger-soft: var(--danger-soft);
-  --color-danger-line: var(--danger-line);
-  --color-danger-ink: var(--danger-ink);
-  --color-danger-strong: var(--danger-strong);
+  --color-sun-soft: #fff6d6;
+  --color-sun: #ffe9a8;
+  --color-sun-ink: #6b4a00;
+  --color-mint-soft: #e6f7ee;
+  --color-mint-ink: #0b6b45;
+  --color-sky-soft: #eaf0ff;
+  --color-sky-ink: #2148a8;
+  --color-stone-soft: #f4efec;
+  --color-stone-ink: #5a4a42;
+  --color-danger-soft: #fef0ee;
+  --color-danger-line: #f6cdc6;
+  --color-danger-ink: #8f1d12;
 }
 
 body {
   margin: 0;
-  background: var(--ground);
-  color: var(--ink);
+  background: var(--color-ground);
+  color: var(--color-ink);
   font-family: var(--font-sans);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Small shared building blocks (usable as class names, e.g. className="card") */
-@utility card {
-  @apply rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(20,23,28,0.04)];
+/* --- Animations --- */
+@keyframes sway {
+  0%, 100% { transform: scaleY(0.55); }
+  50% { transform: scaleY(1); }
 }
-@utility eyebrow {
-  @apply text-[13px] font-semibold tracking-[0.06em] uppercase;
+@keyframes bounce-bar {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
 }
-@utility btn-primary {
-  @apply inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] bg-accent px-3.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50;
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-@utility btn-secondary {
-  @apply inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-line-strong bg-surface px-3.5 text-sm font-medium text-ink transition-colors hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-50;
+@keyframes pop {
+  0% { transform: scale(0.85); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); }
 }
-@utility time-chip {
-  @apply inline-block rounded-md bg-subtle px-[7px] py-0.5 font-mono text-[12.5px] whitespace-nowrap text-ink-2;
+@keyframes strike {
+  from { text-decoration-color: transparent; opacity: 1; }
+  to { text-decoration-color: currentColor; opacity: 0.5; }
+}
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 138, 61, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 138, 61, 0.18); }
+}
+
+@utility bar-sway {
+  transform-origin: 50% 100%;
+  animation: sway 1.4s ease-in-out infinite;
+}
+@utility bar-bounce {
+  transform-origin: 50% 100%;
+  animation: bounce-bar 0.9s ease-in-out infinite;
+}
+@utility rise-in {
+  animation: rise 0.45s ease-out both;
+}
+@utility pop-in {
+  animation: pop 0.5s ease-out both;
+}
+@utility strike-out {
+  text-decoration-line: line-through;
+  text-decoration-thickness: 2px;
+  animation: strike 0.5s ease-out both;
+}
+@utility glow-now {
+  animation: glow 1.6s ease-in-out infinite;
+}
+
+/* Small shared pieces */
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+@utility btn-orange {
+  @apply inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full bg-orange px-4 font-bold text-ink transition-transform hover:-translate-y-px active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-outline {
+  @apply inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-line bg-ground px-4 font-semibold text-ink transition-colors hover:border-orange;
+}
+@utility chip {
+  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[13.5px] font-semibold;
+}
+@utility focus-ring {
+  @apply focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-orange;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
