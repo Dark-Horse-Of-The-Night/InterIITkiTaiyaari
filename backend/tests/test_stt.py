@@ -85,7 +85,7 @@ def test_no_speech_gives_clear_error(audio: Path) -> None:
         (api_error(openai.AuthenticationError, 401), "Check STT_API_KEY"),
         (api_error(openai.RateLimitError, 429), "Wait a minute"),
         (api_error(openai.NotFoundError, 404), "Check STT_MODEL"),
-        (api_error(openai.BadRequestError, 400), "could not process this audio"),
+        (api_error(openai.BadRequestError, 400), "exporting the recording as .mp3"),
         (api_error(openai.InternalServerError, 500), "unexpected error"),
         (openai.APIConnectionError(request=FAKE_REQUEST), "Check your internet connection"),
         (openai.APITimeoutError(request=FAKE_REQUEST), "Check your internet connection"),

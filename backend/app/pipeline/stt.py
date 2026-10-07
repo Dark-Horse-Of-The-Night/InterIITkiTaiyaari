@@ -8,6 +8,7 @@ import openai
 from openai import OpenAI
 
 from app.config import Settings
+from app.pipeline.api_errors import explain_api_error
 from app.pipeline.audio import prepare_for_stt, validate_audio_file
 from app.pipeline.errors import STAGE_STT, PipelineError
 from app.pipeline.models import Segment, Transcript
@@ -47,7 +48,10 @@ def transcribe(audio_path: Path, client: Any, model: str) -> Transcript:
                 temperature=0,
             )
     except openai.APIError as error:
-        raise _explain_api_error(error, model) from None
+        raise explain_api_error(
+            error, STAGE_STT, "STT", model,
+            bad_request_fix="Try exporting the recording as .mp3 or .wav and upload it again.",
+        ) from None
 
     segments = [
         Segment(start=float(seg.start), end=float(seg.end), text=seg.text.strip())
@@ -61,18 +65,3 @@ def transcribe(audio_path: Path, client: Any, model: str) -> Transcript:
             "Check that the recording contains people talking and is not silent.",
         )
     return Transcript(segments=segments)
-
-
-def _explain_api_error(error: openai.APIError, model: str) -> PipelineError:
-    """Turn an API error into a plain-English message saying what to do."""
-    if isinstance(error, openai.AuthenticationError):
-        return PipelineError(STAGE_STT, "the API key was rejected", "Check STT_API_KEY in backend/.env.")
-    if isinstance(error, openai.RateLimitError):
-        return PipelineError(STAGE_STT, "the speech-to-text service is busy (rate limit reached)", "Wait a minute and try again.")
-    if isinstance(error, openai.NotFoundError):
-        return PipelineError(STAGE_STT, f"the model '{model}' was not found", "Check STT_MODEL in backend/.env.")
-    if isinstance(error, openai.BadRequestError):
-        return PipelineError(STAGE_STT, "the service could not process this audio", "Try exporting the recording as .mp3 or .wav and upload it again.")
-    if isinstance(error, openai.APIConnectionError):  # also covers timeouts
-        return PipelineError(STAGE_STT, "could not reach the speech-to-text service", "Check your internet connection and STT_BASE_URL, then try again.")
-    return PipelineError(STAGE_STT, "the speech-to-text service returned an unexpected error", "Wait a moment and try again.")

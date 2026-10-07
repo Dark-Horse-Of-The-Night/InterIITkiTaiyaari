@@ -3,6 +3,7 @@
 # Stage names shown to users.
 STAGE_FILE_CHECK = "File check"
 STAGE_STT = "Speech-to-text"
+STAGE_REFINER = "Refiner"
 
 
 class PipelineError(Exception):

@@ -20,3 +20,22 @@ class Transcript(BaseModel):
     def text(self) -> str:
         """The whole transcript as one string."""
         return " ".join(segment.text for segment in self.segments)
+
+
+class Correction(BaseModel):
+    """One change the refiner made, e.g. "CICD" -> "CI/CD" in segment 4."""
+
+    segment_id: int
+    before: str
+    after: str
+
+
+class RefinedTranscript(Transcript):
+    """The output of the refiner: the same segments (same timestamps) with terms corrected.
+
+    `corrections` is computed by comparing old and new text, not taken from the model.
+    `warnings` lists segments where an edit was rejected and the original wording kept.
+    """
+
+    corrections: list[Correction] = []
+    warnings: list[str] = []
