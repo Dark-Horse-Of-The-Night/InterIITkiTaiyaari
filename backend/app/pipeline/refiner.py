@@ -96,7 +96,9 @@ def refine(
 
         for segment_id, segment in zip(ids, batch):
             new_text = proposed.get(segment_id, segment.text)  # not returned = unchanged
-            problem = check_edit(segment.text, new_text)
+            previous_text = segments[segment_id - 1].text if segment_id > 0 else ""
+            next_text = segments[segment_id + 1].text if segment_id + 1 < len(segments) else ""
+            problem = check_edit(segment.text, new_text) or check_boundaries(previous_text, segment.text, new_text, next_text)
             if problem:
                 warnings.append(
                     f"Segment {segment_id + 1} ({format_time(segment.start)}): kept the original wording "
@@ -191,6 +193,34 @@ def check_edit(original: str, refined: str) -> str | None:
     if many_words_changed and letter_similarity(original, refined) < MIN_SIMILARITY:
         return "rewrote too much of the segment"
     return None
+
+
+def check_boundaries(previous_text: str, original: str, refined: str, next_text: str) -> str | None:
+    """Catch fixes to a term that Whisper split across two segments.
+
+    E.g. "...switch our logging to open" | "telemetry. People had...": turning "open" into
+    "OpenTelemetry" would leave "OpenTelemetry telemetry". Words can't move between segments
+    (timestamps belong to them), so such an edit is rejected and the original wording kept.
+    """
+    if refined == original:
+        return None
+    next_first = _edge_word(next_text, first=True)
+    if next_first and _edge_word(refined, first=False).endswith(next_first) and not _edge_word(original, first=False).endswith(next_first):
+        return "would repeat a word that continues in the next segment"
+    previous_last = _edge_word(previous_text, first=False)
+    if previous_last and _edge_word(refined, first=True).startswith(previous_last) and not _edge_word(original, first=True).startswith(previous_last):
+        return "would repeat a word that starts in the previous segment"
+    return None
+
+
+def _edge_word(text: str, first: bool) -> str:
+    """The first or last word, lowercased, letters and digits only ("Telemetry." -> "telemetry").
+    Short words (under 3 letters) are ignored to avoid false alarms on "a", "to", "of"."""
+    words = text.split()
+    if not words:
+        return ""
+    word = re.sub(r"[^a-z0-9]", "", (words[0] if first else words[-1]).lower())
+    return word if len(word) >= 3 else ""
 
 
 def punctuation(text: str) -> Counter[str]:

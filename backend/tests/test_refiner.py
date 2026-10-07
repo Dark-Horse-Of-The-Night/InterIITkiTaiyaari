@@ -219,3 +219,33 @@ def test_no_glossary_says_none_provided() -> None:
     refine(make_transcript("Hello."), client, model="fake")
 
     assert "(none provided)" in client.calls[0]["messages"][0]["content"]
+
+
+def test_term_split_across_segments_is_not_duplicated() -> None:
+    transcript = make_transcript("We should switch our logging to open", "telemetry. People had mixed feelings.")
+    client = FakeChatClient(replies=[json.dumps({"segments": [{"id": 0, "text": "We should switch our logging to OpenTelemetry"}]})])
+
+    refined = refine(transcript, client, model="fake")
+
+    assert refined.text == "We should switch our logging to open telemetry. People had mixed feelings."  # unchanged
+    assert "would repeat a word that continues in the next segment" in refined.warnings[0]
+
+
+def test_split_term_fixed_in_the_second_segment_is_also_caught() -> None:
+    transcript = make_transcript("We moved the jobs to cooper", "netties last week.")
+    client = FakeChatClient(replies=[json.dumps({"segments": [{"id": 1, "text": "cooper Kubernetes last week."}]})])
+
+    refined = refine(transcript, client, model="fake")
+
+    assert refined.segments[1].text == "netties last week."
+    assert "starts in the previous segment" in refined.warnings[0]
+
+
+def test_normal_fix_next_to_a_boundary_is_allowed() -> None:
+    transcript = make_transcript("We store sessions in redis", "and logs in elastic search.")
+    client = FakeChatClient({"redis": "Redis", "elastic search": "Elasticsearch"})
+
+    refined = refine(transcript, client, model="fake")
+
+    assert refined.text == "We store sessions in Redis and logs in Elasticsearch."
+    assert refined.warnings == []
