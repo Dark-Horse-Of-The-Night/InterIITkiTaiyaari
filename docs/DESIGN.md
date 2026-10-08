@@ -8,6 +8,7 @@ This document explains *why* the AI Meeting Assistant is built the way it is. Mo
 3. [Stage 2: refiner](#3-stage-2-refiner)
 4. [Stage 3: documenter](#4-stage-3-documenter)
 4b. [Speakers: labels and names](#4b-speakers-labels-and-names)
+4c. [Trust features: the assistant checks itself](#4c-trust-features-the-assistant-checks-itself)
 5. [Long meetings](#5-long-meetings)
 6. [Reliability: timeouts, retries, rate limits](#6-reliability-timeouts-retries-rate-limits)
 7. [Web app](#7-web-app)
@@ -98,6 +99,15 @@ The problem statement asks for real speaker names where they can be worked out, 
    Names replace labels in the **refined** transcript. That is also what makes raw and refined differ even when Whisper heard every term correctly.
 3. **Owners.** The documenter sees who said each line. "I'll have a fix ready by Friday" spoken by an identified *Neha* makes Neha the owner, and the owner check counts a line's identified speaker as "stated". From an unnamed "Speaker 2", "I" is still unknown, so the owner stays Unspecified; a label is never an owner.
 
+## 4c. Trust features: the assistant checks itself
+
+The problem statement's core worry is a record that doesn't reflect the recording. Beyond preventing errors, the app now **reports** what it checked and **points to where it might still be wrong**. All of this is code, with no extra model calls.
+
+- **Trust report** ([`trust.py`](../backend/app/pipeline/trust.py)). The refiner already rejects unsafe edits and the documenter's verifier already removes unsupported items and unstated owners/deadlines. Each fix is now also counted by kind (`blocked_edits` on the refined transcript, `fix_counts` on the record), so the report comes from real check results rather than by parsing messages. It is shown as a card and included in both downloads.
+- **Unclear audio** ([`stt.py`](../backend/app/pipeline/stt.py)). Whisper's `verbose_json` includes `avg_logprob`, `no_speech_prob` and `compression_ratio` per segment. On Groq these are scored per ~30-second decoding window, not per sentence, so neighbouring lines share a score (word-level confidence isn't available). Measured on our samples: clean speech scored -0.13 to -0.35; heavy pink noise (amplitude 0.8) that made Whisper drop a sentence scored **-0.59**, while milder noise with a few wrong words stayed around -0.25. Threshold: `avg_logprob < -0.4`, or `no_speech_prob > 0.6` (probably not speech), or `compression_ratio > 2.4` (Whisper's standard sign of repetition). So the flag catches badly garbled stretches, not every single misheard word; it is a prompt to listen, not a guarantee. Items whose quote comes from such lines are marked "check audio".
+- **Glossary → Whisper.** The glossary is also sent as Whisper's `prompt` ("Terms used in this meeting: …"), cut to fit Whisper's ~224-token prompt window. Without a glossary nothing is sent, so default behaviour is unchanged.
+- **Speaking stats** ([`stats.py`](../backend/app/pipeline/stats.py)). Talk time and share per speaker, turns (consecutive lines with gaps under 2 s are one turn), longest turn and questions asked (lines ending in "?"). Only shown when there are at least two voices.
+
 ## 5. Long meetings
 
 Groq's free tier allows **8,000 tokens per minute** per model, for every chat model on the account (checked from response headers). A single documenter request for even a **48-second** meeting used 4,178 tokens (≈1,800 prompt and schema overhead, ≈1,600 hidden reasoning), so a single request can't cover more than a few minutes of transcript.
@@ -149,7 +159,8 @@ All test meetings were generated with macOS `say` from known scripts ([`scripts/
 | **35-minute meeting with cross-part traps** | ⚠️ **Partial.** Transcription (8 parts) and refiner (11 batches) completed in the browser with live progress. The documenter reached part 3 of 10 and then hit the free tier's **daily** token limit (197,464 / 200,000 used during development). The cross-part traps (proposal in part 1 accepted at 70%, decision reversed at 90%, owner + deadline at 30%) are covered by unit tests with fake model replies, but not yet verified with the real model |
 | **5-voice meeting, speaker naming** (`scripts/make_speaker_meeting.py`, 56 s; true labels supplied to isolate the naming step) | ✅ **3/3** provable names in 2/2 runs: Neha and Rahul (addressed, then answer) and Tom (self-introduction). The host and the questioner, never named, stay **Speaker 1 / Speaker 5**. Documenter: crash fix → **Neha**, by Friday; Mixpanel account → **Tom**, this week; release notes → **Unspecified** (Neha declined). The answered App Store question correctly isn't an open item. The first prompt version found only 2/3; asking it to check every addressed name fixed that |
 | **Error handling** | ✅ Text file renamed `.mp3` · empty file · unsupported format · oversized upload · no file · unknown job · wrong key · rate limits · hung service · daily limit: each gives a specific stage + message + fix |
-| **Automated tests** | ✅ 168 backend (pytest) + 27 frontend (Vitest) |
+| **Noisy call** (`samples/noisy_meeting`, the 5-voice meeting with loud hiss) | ✅ Trust report: 3 items verified, **3 unclear audio spots** (the end, where Whisper dropped "I can't take that on this week"), highlighted in both transcripts. ⚠️ Noise also hurt voice grouping (5 voices → 3) and turned "Rahul" into "Majul", which then became a speaker name, since that is what the transcript says. This is exactly the kind of recording where the "worth a listen" flags matter |
+| **Automated tests** | ✅ 195 backend (pytest) + 42 frontend (Vitest) |
 
 **Run-to-run variation.** LLM output varies slightly even at temperature 0 (e.g. "by March 3rd" vs "March 3rd", different task wording). Across repeated runs of `hard_meeting`, the classification (decision vs proposal, owners, Unspecified) stayed the same.
 

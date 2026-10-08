@@ -1,0 +1,168 @@
+{
+  "summary": "The meeting covered the upcoming mobile release, including an Android crash update, a proposal to migrate analytics to Mixpanel, and a quick check on app store review times. The team decided to switch analytics to Mixpanel, with Tom handling the account setup, and the Android crash is slated to be fixed by Friday. Additional items such as updating the release mode were noted for later.",
+  "minutes": [
+    {
+      "topic": "Android crash update",
+      "points": [
+        "Neha asked for an Android crash update",
+        "Crash originates from the image cache",
+        "Fix scheduled for Friday"
+      ],
+      "segment_ids": [
+        1,
+        2
+      ]
+    },
+    {
+      "topic": "Analytics migration",
+      "points": [
+        "Proposal to move analytics from Firebase to Mixpanel",
+        "Tom will set up a Mixpanel account",
+        "Decision to switch to Mixpanel"
+      ],
+      "segment_ids": [
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "topic": "App store review timing",
+      "points": [
+        "Question about whether the app store review still takes a week",
+        "Answer: last time it took about three days"
+      ],
+      "segment_ids": [
+        7,
+        8
+      ]
+    },
+    {
+      "topic": "Release mode update",
+      "points": [
+        "Need to update the release mode, to be addressed later"
+      ],
+      "segment_ids": [
+        9
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "text": "We'll switch to Mixpanel.",
+      "evidence": {
+        "segment_ids": [
+          6
+        ],
+        "quote": "We'll switch to Mixpanel.",
+        "start": 31.56,
+        "unclear": false
+      }
+    }
+  ],
+  "action_items": [
+    {
+      "task": "Set up a Mixpanel account",
+      "owner": "Tom",
+      "deadline": "this week",
+      "evidence": {
+        "segment_ids": [
+          5
+        ],
+        "quote": "I'll set up a Mixpanel account this week.",
+        "start": 23.56,
+        "unclear": false
+      }
+    },
+    {
+      "task": "Fix the Android crash",
+      "owner": null,
+      "deadline": "by Friday",
+      "evidence": {
+        "segment_ids": [
+          2
+        ],
+        "quote": "I'll have it fixed ready by Friday.",
+        "start": 7.7,
+        "unclear": false
+      }
+    }
+  ],
+  "open_items": [],
+  "warnings": [],
+  "trust_report": {
+    "items_verified": 3,
+    "items_removed": 0,
+    "details_removed": 0,
+    "items_superseded": 0,
+    "owners_unspecified": 1,
+    "deadlines_unspecified": 0,
+    "corrections": 0,
+    "edits_blocked": {},
+    "speakers_named": 2,
+    "speakers_unnamed": 1,
+    "unclear_segments": 3,
+    "unclear_items": 0,
+    "notes": []
+  },
+  "speaking_stats": {
+    "speakers": [
+      {
+        "speaker": "Speaker 1",
+        "seconds": 34.4,
+        "share": 0.664,
+        "turns": 3,
+        "longest_turn_seconds": 16.6,
+        "questions": 3
+      },
+      {
+        "speaker": "Majul",
+        "seconds": 9.4,
+        "share": 0.181,
+        "turns": 2,
+        "longest_turn_seconds": 6.4,
+        "questions": 0
+      },
+      {
+        "speaker": "Tom",
+        "seconds": 8.0,
+        "share": 0.154,
+        "turns": 1,
+        "longest_turn_seconds": 8.0,
+        "questions": 0
+      }
+    ],
+    "timeline": [
+      {
+        "speaker": "Speaker 1",
+        "start": 0.0,
+        "end": 16.619999
+      },
+      {
+        "speaker": "Majul",
+        "start": 17.18,
+        "end": 23.56
+      },
+      {
+        "speaker": "Tom",
+        "start": 23.56,
+        "end": 31.56
+      },
+      {
+        "speaker": "Speaker 1",
+        "start": 31.56,
+        "end": 40.559998
+      },
+      {
+        "speaker": "Majul",
+        "start": 40.559998,
+        "end": 43.559998
+      },
+      {
+        "speaker": "Speaker 1",
+        "start": 43.559998,
+        "end": 54.559998
+      }
+    ]
+  }
+}

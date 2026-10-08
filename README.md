@@ -23,6 +23,7 @@ flowchart LR
 
 ## Contents
 - [What you get](#what-you-get)
+- [Beyond the problem statement](#beyond-the-problem-statement)
 - [Quick start](#quick-start)
 - [How it works](#how-it-works)
 - [How the problem statement's rules are enforced](#how-the-problem-statements-rules-are-enforced)
@@ -44,13 +45,37 @@ More detail on design decisions, measurements and evaluation: **[docs/DESIGN.md]
 | **Raw transcript** | Whisper's output with timestamps, each line labelled by voice: **Speaker 1**, **Speaker 2**… |
 | **Refined transcript** | Same segments and timestamps, with misrecognised technical terms fixed (`CICD → CI/CD`, `open telemetry → OpenTelemetry`) and speakers given **real names where the recording proves them** (someone introduces themselves, or is addressed by name and answers). Others keep their label rather than a guess. Corrections are highlighted; hover to see what Whisper heard |
 | **Meeting record** | Summary · minutes by topic · key decisions · action items (task, owner, deadline) · open proposals and questions. Every item shows its timestamp and supporting quote |
-| **Downloads** | `record.md`, `record.json`, `refined-transcript.txt`, `raw-transcript.txt`. The Markdown and JSON are generated from the same data |
+| **Trust report** | What the automatic checks verified, removed or blocked for this recording (see [below](#beyond-the-problem-statement)) |
+| **Who spoke** | Talk time, share, turns and questions per person, plus a clickable "who spoke when" timeline |
+| **Downloads** | `record.md`, `record.json`, `refined-transcript.txt`, `raw-transcript.txt`. The Markdown and JSON are generated from the same data, and both include the trust report and speaking stats |
 
 **The interface** (designed page by page as mockups first: bright, simple and playful):
 - **Upload:** a big drop zone with a swaying sound-bar mascot, optional "words we should know", and one-click sample meetings.
 - **Processing:** the current step in plain words ("Fixing the jargon…"), step pills, part-by-part progress, retry notes, and a **live fix-it card**: as soon as the refiner finishes, each misheard word is struck through and the right term pops in, while the record is still being written.
 - **Results:** an **audio player** with the recording's real waveform. Click any to-do, quote or transcript line to hear that moment, and the transcript highlights the line being played (karaoke style). It also has quick stats, to-do cards with owner and deadline chips ("Needs an owner" instead of a guess), and the transcript as chat bubbles per speaker with fixes highlighted.
 - All motion respects the system's "reduce motion" setting. Errors always say which stage failed, what happened and what to do.
+
+## Beyond the problem statement
+
+The problem statement's core worry is a record that doesn't match what was said. So the extras share one idea: **minutes you can trust. The assistant checks itself, and shows you where it might be wrong.** None of them invent content: they are computed by code from the recording, the transcript and the checks that already run.
+
+**New in this version**
+
+| Feature | What it does | How |
+|---|---|---|
+| **Trust report** | A card on the results page (and a section in both downloads): *items backed by a quote · guesses removed · risky edits blocked · unclear audio spots*, plus owners/deadlines left Unspecified, speakers named from evidence, and a "see what the checks changed" list | Counts the fixes the code checks make in the refiner and documenter ([`trust.py`](backend/app/pipeline/trust.py)). No model call, no extra tokens |
+| **"Unclear audio" flags** | Lines where speech recognition itself was unsure are highlighted in both transcripts ("worth a listen"), and any decision or task quoting them gets a **⚠ check audio** tag | Whisper reports a confidence for each stretch of audio (`avg_logprob`, `no_speech_prob`, `compression_ratio`), which is usually thrown away. Cut-off tuned on clean vs noisy copies of our samples ([`stt.py`](backend/app/pipeline/stt.py)) |
+| **Glossary helps transcription too** | The optional "words we should know" are also given to Whisper as a hint, so names and terms come out right *before* the refiner, not just after | Whisper's `prompt` parameter, sent with every part of a long recording |
+| **Who spoke** | Talk time, share, turns and questions per person, and a "who spoke when" timeline under the player: click a block to hear that turn | Code only, from speaker labels and timestamps ([`stats.py`](backend/app/pipeline/stats.py)) |
+
+**Already built in (beyond the basic requirements)**
+
+- **Every item is proven.** Each decision, task and open item must quote the transcript; code removes any whose quote isn't there, and checks owners and deadlines were actually said nearby. Click a timestamp to hear the moment.
+- **The refiner is fenced in by code.** Edits that change a number, negation, commitment word or punctuation, or rewrite too much, are rejected and the original wording kept.
+- **Speakers by voice, named only with proof**: voices are grouped locally (SpeechBrain), and a label becomes a name only when someone introduces themselves or is addressed by name and answers.
+- **Live fix-it preview**: corrections appear while the record is still being written.
+- **Audio player with karaoke transcript**: the recording's real waveform; the line being played lights up.
+- **Long meetings**: split at pauses, documented in parts, joined by code and cross-checked, all within free-tier limits.
 
 ## Quick start
 
@@ -120,7 +145,7 @@ All providers are called through the **OpenAI Python SDK** using `base_url`, so 
 | Endpoint | Purpose |
 |---|---|
 | `POST /api/meetings` | Upload (`file`, optional `glossary`). Bad files are rejected immediately with a specific message; good ones return `202` with a `job_id` |
-| `GET /api/meetings/{job_id}` | Progress of each stage, the refiner's corrections as soon as they exist (`preview`), then the full result: transcripts, corrections, record JSON, Markdown, models used, timings |
+| `GET /api/meetings/{job_id}` | Progress of each stage, the refiner's corrections as soon as they exist (`preview`), then the full result: transcripts (with per-line confidence), corrections, record, trust report, speaking stats, the Markdown and JSON downloads, models used, timings |
 | `GET /api/samples`, `GET /api/samples/{id}/audio` | The sample meetings offered on the upload page |
 | `GET /health` | Server status and configured models |
 
@@ -169,8 +194,8 @@ Rough timings on the free tier: short meeting 10–15 s; 13-minute meeting ~5 mi
 ## Testing
 
 ```bash
-cd backend && .venv/bin/pytest          # 173 tests
-cd frontend && npm test                 # 35 tests
+cd backend && .venv/bin/pytest          # 195 tests
+cd frontend && npm test                 # 42 tests
 cd frontend && npm run build && npm run lint
 ```
 
@@ -181,15 +206,16 @@ Tests never call real AI services. They use fake clients (including failures, ra
 python3 scripts/make_test_meeting.py 15 my_meeting            # ~15 minutes
 python3 scripts/make_test_meeting.py 40 long_meeting --traps  # with cross-meeting traps
 ```
-The script text in `scratch/` is the ground truth to compare the record against. For speakers, `python3 scripts/make_speaker_meeting.py` makes a 5-voice meeting where three people can be named from the audio and two can't.
+The script text in `scratch/` is the ground truth to compare the record against. For speakers, `python3 scripts/make_speaker_meeting.py` makes a 5-voice meeting where three people can be named from the audio and two can't, and `python3 scripts/make_noisy_meeting.py` makes a noisy copy of it to see the unclear-audio flags.
 
 ## Samples
 
-[`samples/`](samples/) contains four short synthetic meetings and the pipeline's real output for each (audio, raw and refined transcripts, `record.md`, `record.json`), each generated by the app (the model used for the refiner and documenter is noted per sample):
+[`samples/`](samples/) contains five short synthetic meetings and the pipeline's real output for each (audio, raw and refined transcripts, `record.md`, `record.json`), each generated by the app (the model used for the refiner and documenter is noted per sample):
 
 - **[`meeting`](samples/meeting/record.md)**: a sprint planning with an owner + deadline ("Priya… by Friday"), an unaccepted proposal, a decision, and a task nobody volunteered for (→ Unspecified). _(gpt-oss-120b)_
 - **[`technical_meeting`](samples/technical_meeting/refined_transcript.txt)**: an ML review full of spoken jargon. Compare `raw_transcript.txt` with `refined_transcript.txt`: the refiner fixes `Atom Optimizer → Adam Optimizer`, `agent decomposition → eigen decomposition`, `ONYX → ONNX`, `Tensor RT → TensorRT`, `A-B → A/B`, and names Priya, Arjun and Tom. It leaves numbers ("3e-4", "0.87"), negations ("Not yet") and commitments exactly as spoken. Terms too garbled to restore safely ("and date quantization" for INT8) are left alone rather than guessed. `expected.txt` lists the script. _(gpt-oss-20b)_
 - **[`speakers_meeting`](samples/speakers_meeting/refined_transcript.txt)**: five different voices. The raw transcript labels them Speaker 1–5; the refined transcript names **Neha** and **Rahul** (addressed by name, then answer) and **Tom** (introduces himself), while the host and a questioner, never named, keep their labels. Neha and Tom become owners of what they said "I'll…" about. `expected.txt` is the ground truth. _(gpt-oss-20b)_
+- **[`noisy_meeting`](samples/noisy_meeting/record.md)**: the Release sync with loud hiss mixed in ([`scripts/make_noisy_meeting.py`](scripts/make_noisy_meeting.py)), like a bad call line. Speech recognition drops words at the end and says so: the trust report shows **3 unclear audio spots**, and those lines are highlighted in the transcripts. Noise also makes two voices harder to tell apart. _(gpt-oss-120b)_
 - **[`hard_meeting`](samples/hard_meeting/record.md)**: a proposal that is accepted later (→ decision), a decision that's reversed (→ final outcome only), "I'll take care of it" (→ Unspecified owner), an unanswered suggestion, and an unanswered question. _(gpt-oss-120b)_
 
 ## Project structure
@@ -204,13 +230,15 @@ backend/
     prompts/             refiner.md, speaker_names.md, documenter.md, documenter_reconcile.md
     pipeline/            No FastAPI imports in here
       audio.py           File checks, conversion, splitting at pauses (ffmpeg)
-      stt.py             Stage 1: speech-to-text
+      stt.py             Stage 1: speech-to-text (+ glossary hint, confidence / unclear-audio flags)
       speakers.py        Stage 1: speaker labels by voice (optional SpeechBrain model)
       speaker_names.py   Stage 2: evidence-checked speaker names
       refiner.py         Stage 2: term correction + safety checks
       documenter.py      Stage 3: record + quote/owner/deadline checks
       merge.py           Joining a long meeting's parts + validated cross-check
-      render.py          Markdown and JSON from one MeetingRecord
+      trust.py           Trust report: counts what the checks verified, removed or blocked
+      stats.py           Speaking stats: talk time, turns, questions, timeline
+      render.py          Markdown and JSON from one MeetingRecord (+ trust report, speaking stats)
       run.py             Runs the three stages in order (the only place the order is defined)
       retry.py           Timeouts and visible retries
       llm_json.py        Structured-output requests
@@ -221,11 +249,11 @@ backend/
 frontend/
   src/
     App.tsx, api.ts, types.ts, useJobPolling.ts, fileChecks.ts, format.ts
-    components/          UploadForm, ProgressSteps, JobView, Results, RecordView, TranscriptView, ErrorMessage
+    components/          UploadForm, ProgressSteps, JobView, Results, RecordView, TrustReport, SpeakingStats, TranscriptView, AudioPlayer, ErrorMessage
     test/                Vitest + React Testing Library
 docs/DESIGN.md           Design decisions, measurements, evaluation
 samples/                 Example recordings with real outputs
-scripts/                 make_test_meeting.py, make_speaker_meeting.py (test meeting generators)
+scripts/                 make_test_meeting.py, make_speaker_meeting.py, make_noisy_meeting.py (test meeting generators)
 ```
 
 ## Known limitations

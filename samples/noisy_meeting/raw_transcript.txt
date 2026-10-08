@@ -1,0 +1,13 @@
+[00:00] Speaker 1: Good morning, everyone. Let's go through the mobile release.
+[00:04] Speaker 1: Neha, can you give us an update on the Android crash?
+[00:07] Speaker 1: Sure. The crash comes from the image cache. I'll have it fixed ready by Friday.
+[00:12] Speaker 1: Great. And, Majul, anything on the analytics side?
+[00:17] Speaker 2: Yes. I suggest we move our analytics from Firebase to Mixpanel. It's cheaper for our volume.
+[00:23] Speaker 3: Hi, this is Tom from the platform team. I think that's a good idea, and I'll set up a Mixpanel account this week.
+[00:31] Speaker 1: Okay, let's do that. We'll switch to Mixpanel.
+[00:35] Speaker 1: Quick question, does anyone know if the app store review still takes a week?
+[00:40] Speaker 2: Last time it took about three days.
+[00:43] Speaker 1: Quick, someone needs to update the release mode, but we can sort that out later.
+[00:48] Speaker 1: I'm sorry.
+[00:50] Speaker 1: No problem. That's everything.
+[00:52] Speaker 1: Sam. Everyone.

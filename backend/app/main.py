@@ -191,6 +191,7 @@ SAMPLES = {
     "technical_meeting": ("Model review", "recording.m4a"),
     "speakers_meeting": ("Release sync", "recording.m4a"),
     "meeting": ("Sprint planning", "recording.mp3"),
+    "noisy_meeting": ("Noisy call", "recording.mp3"),
 }
 
 
