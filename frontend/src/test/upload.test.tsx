@@ -113,6 +113,18 @@ describe('App upload', () => {
     expect(screen.getByRole('button', SUBMIT)).toBeInTheDocument()
   })
 
+  it('goes back to the upload page when the logo is clicked', async () => {
+    fakeFetch(makeJob('queued', ['pending', 'pending', 'pending']))
+    render(<App />)
+    await chooseAndSubmit()
+    expect(await screen.findByText('Listening')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /back to the upload page/ }))
+
+    expect(screen.getByRole('button', SUBMIT)).toBeInTheDocument()
+    expect(screen.queryByText('Listening')).not.toBeInTheDocument()
+  })
+
   it('explains when the server is unreachable', async () => {
     fakeFetch(new TypeError('Failed to fetch'))
     render(<App />)

@@ -30,13 +30,23 @@ export default function App() {
     setJob(null)
     setFile(null)
     setUploadError(null)
+    window.scrollTo?.({ top: 0 })
   }
 
   return (
     <div className="relative isolate min-h-screen text-ink">
       <WaveBackground />
       <header className="mx-auto flex max-w-[1040px] items-center justify-between gap-3 px-6 py-5">
-        <Logo />
+        {/* The logo always leads back to the upload page, like "New recording". */}
+        <button
+          type="button"
+          onClick={reset}
+          disabled={uploading}
+          aria-label="Meeting Assistant: back to the upload page"
+          className="focus-ring cursor-pointer rounded-xl transition-transform hover:scale-[1.03] disabled:cursor-wait"
+        >
+          <Logo />
+        </button>
         {(job || uploadError) && (
           <button type="button" onClick={reset} className="btn-outline focus-ring border-ink">
             + New recording
