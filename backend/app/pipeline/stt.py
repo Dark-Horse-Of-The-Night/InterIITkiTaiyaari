@@ -25,7 +25,7 @@ logger = logging.getLogger("app.pipeline.stt")
 # Glossary hint for Whisper: it only reads the last ~224 tokens of a prompt.
 MAX_HINT_CHARS = 600
 # A stretch is "unclear" (worth a listen) when Whisper's own scores say it was unsure.
-# Tuned on our samples: clean speech never went below -0.35; heavy noise that dropped words scored -0.59.
+# Tuned on our samples: clean speech never went below -0.32; heavy noise that dropped a sentence scored -0.59.
 UNCLEAR_LOGPROB = -0.4
 UNCLEAR_NO_SPEECH = 0.6  # probably not speech, so any words there may be invented
 UNCLEAR_COMPRESSION = 2.4  # Whisper's standard sign of repeating itself
@@ -154,7 +154,7 @@ def confidence_fields(whisper_segment: Any) -> dict[str, Any]:
     """Read Whisper's own confidence for a segment and decide if it is worth a listen.
 
     avg_logprob: average log-probability of the words (0 = certain). Clean speech scores about
-    -0.1 to -0.35; garbled or noisy stretches drop lower. no_speech_prob: chance it was not speech
+    -0.1 to -0.32; garbled or noisy stretches drop lower. no_speech_prob: chance it was not speech
     (text there may be invented). compression_ratio: high when Whisper repeats itself.
     """
     avg_logprob = getattr(whisper_segment, "avg_logprob", None)
