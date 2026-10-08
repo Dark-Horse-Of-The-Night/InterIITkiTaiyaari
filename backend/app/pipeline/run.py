@@ -15,12 +15,14 @@ from pydantic import BaseModel
 from app.config import Settings
 from app.pipeline.documenter import document, make_documenter_client
 from app.pipeline.errors import STAGE_DOCUMENTER, STAGE_REFINER, STAGE_STT
-from app.pipeline.models import MeetingRecord, RefinedTranscript, Transcript
+from app.pipeline.models import MeetingRecord, RefinedTranscript, SpeakingStats, Transcript, TrustReport
 from app.pipeline.refiner import make_refiner_client, refine
 from app.pipeline.speaker_names import name_speakers
 from app.pipeline.speakers import load_embedder
-from app.pipeline.render import record_to_markdown
+from app.pipeline.stats import build_speaking_stats
+from app.pipeline.render import record_to_json, record_to_markdown
 from app.pipeline.stt import make_stt_client, transcribe_file
+from app.pipeline.trust import build_trust_report
 
 STAGES = [STAGE_STT, STAGE_REFINER, STAGE_DOCUMENTER]
 
@@ -59,7 +61,10 @@ class MeetingResult(BaseModel):
     raw_transcript: Transcript
     refined_transcript: RefinedTranscript
     record: MeetingRecord
-    markdown: str  # generated from `record`, so it always matches the JSON
+    trust: TrustReport  # what the automatic checks verified, removed or blocked (code only)
+    speaking: SpeakingStats | None  # who spoke how much; None without speaker labels (code only)
+    markdown: str  # generated from the same data as `record_json`, so the two always match
+    record_json: str
     models: dict[str, str]
     timings_seconds: dict[str, float]
 
@@ -101,7 +106,7 @@ def run_pipeline(
         STAGE_STT,
         lambda: transcribe_file(
             audio_path, clients.stt, settings.stt_model, settings.max_upload_mb, notes_for(STAGE_STT),
-            settings.max_audio_minutes, details_for(STAGE_STT), clients.speakers,
+            settings.max_audio_minutes, details_for(STAGE_STT), clients.speakers, glossary,
         ),
     )
     def refine_stage() -> RefinedTranscript:
@@ -129,11 +134,16 @@ def run_pipeline(
         ),
     )
 
+    trust = build_trust_report(raw, refined, record)
+    speaking = build_speaking_stats(refined.segments)
     return MeetingResult(
         raw_transcript=raw,
         refined_transcript=refined,
         record=record,
-        markdown=record_to_markdown(record),
+        trust=trust,
+        speaking=speaking,
+        markdown=record_to_markdown(record, trust=trust, speaking=speaking),
+        record_json=record_to_json(record, trust, speaking),
         models={
             STAGE_STT: settings.stt_model,
             STAGE_REFINER: settings.refiner_model,

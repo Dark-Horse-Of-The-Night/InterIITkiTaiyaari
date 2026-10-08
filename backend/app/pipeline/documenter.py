@@ -12,6 +12,7 @@ on the combined record against the whole transcript.
 
 import math
 import re
+from collections import Counter
 from collections.abc import Callable
 from typing import Any
 
@@ -163,53 +164,70 @@ def _request_record(
 
 def verify_record(record: MeetingRecord, segments: list[Segment]) -> MeetingRecord:
     """Remove unsupported items and unstated owners/deadlines. Adds a warning for each fix."""
-    warnings: list[str] = []
+    fixes = Fixes()
     valid_ids = set(range(len(segments)))
 
-    decisions = [d for d in record.decisions if _check_evidence(d.evidence, segments, f"decision '{d.text}'", warnings)]
+    decisions = [d for d in record.decisions if _check_evidence(d.evidence, segments, f"decision '{d.text}'", fixes)]
 
     action_items = []
     for item in record.action_items:
         label = f"action item '{item.task}'"
-        if not _check_evidence(item.evidence, segments, label, warnings):
+        if not _check_evidence(item.evidence, segments, label, fixes):
             continue
         context = _context_text(item.evidence.segment_ids, segments)
-        item.owner = _check_name(item.owner, context, "owner", label, warnings)
-        item.deadline = _check_phrase(item.deadline, context, "deadline", label, warnings)
+        item.owner = _check_name(item.owner, context, "owner", label, fixes)
+        item.deadline = _check_phrase(item.deadline, context, "deadline", label, fixes)
         action_items.append(item)
 
     open_items = []
     for item in record.open_items:
         label = f"{item.kind} '{item.text}'"
-        if not _check_evidence(item.evidence, segments, label, warnings):
+        if not _check_evidence(item.evidence, segments, label, fixes):
             continue
         context = _context_text(item.evidence.segment_ids, segments)
-        item.raised_by = _check_name(item.raised_by, context, "'raised by' name", label, warnings)
+        item.raised_by = _check_name(item.raised_by, context, "'raised by' name", label, fixes)
         open_items.append(item)
 
     for topic in record.minutes:
         topic.segment_ids = [i for i in topic.segment_ids if i in valid_ids]
 
+    counts = dict(record.fix_counts)
+    for kind, number in fixes.counts.items():
+        counts[kind] = counts.get(kind, 0) + number
     return record.model_copy(update={
         "decisions": decisions,
         "action_items": action_items,
         "open_items": open_items,
-        "warnings": record.warnings + warnings,
+        "warnings": record.warnings + fixes.warnings,
+        "fix_counts": counts,
     })
 
 
-def _check_evidence(evidence: Evidence, segments: list[Segment], label: str, warnings: list[str]) -> bool:
+class Fixes:
+    """The adjustments verify_record makes: a plain-English note for each, and a count per kind."""
+
+    def __init__(self) -> None:
+        self.warnings: list[str] = []
+        self.counts: Counter[str] = Counter()
+
+    def add(self, kind: str, warning: str) -> None:
+        self.warnings.append(warning)
+        self.counts[kind] += 1
+
+
+def _check_evidence(evidence: Evidence, segments: list[Segment], label: str, fixes: Fixes) -> bool:
     """Find the quote in the transcript and set the evidence's segment ids and time from where it really is."""
     located = locate_quote(evidence.quote, segments, preferred_ids=evidence.segment_ids)
     if located is None:
-        warnings.append(f"Removed {label}: its supporting quote was not found in the transcript.")
+        fixes.add("unsupported_item", f"Removed {label}: its supporting quote was not found in the transcript.")
         return False
     evidence.segment_ids = located
     evidence.start = segments[located[0]].start
+    evidence.unclear = any(segments[i].unclear for i in located)
     return True
 
 
-def _check_name(name: str | None, context: str, field: str, label: str, warnings: list[str]) -> str | None:
+def _check_name(name: str | None, context: str, field: str, label: str, fixes: Fixes) -> str | None:
     """Keep a name only if every word of it is stated near the evidence."""
     if name is None:
         return None
@@ -219,18 +237,18 @@ def _check_name(name: str | None, context: str, field: str, label: str, warnings
     context_words = set(context.split())
     if all(word in context_words for word in words):
         return name
-    warnings.append(f"Removed {field} '{name}' from {label}: not stated in the recording near that point.")
+    fixes.add("unstated_detail", f"Removed {field} '{name}' from {label}: not stated in the recording near that point.")
     return None
 
 
-def _check_phrase(phrase: str | None, context: str, field: str, label: str, warnings: list[str]) -> str | None:
+def _check_phrase(phrase: str | None, context: str, field: str, label: str, fixes: Fixes) -> str | None:
     """Keep a phrase (e.g. a deadline) only if it appears word for word near the evidence."""
     if phrase is None:
         return None
     normalized = normalize(phrase)
     if normalized and f" {normalized} " in f" {context} ":
         return phrase
-    warnings.append(f"Removed {field} '{phrase}' from {label}: not stated in the recording near that point.")
+    fixes.add("unstated_detail", f"Removed {field} '{phrase}' from {label}: not stated in the recording near that point.")
     return None
 
 

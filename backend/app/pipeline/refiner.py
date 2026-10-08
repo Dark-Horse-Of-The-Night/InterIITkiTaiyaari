@@ -85,6 +85,7 @@ def refine(
     refined_texts: list[str] = []
     corrections: list[Correction] = []
     warnings: list[str] = []
+    blocked: Counter[str] = Counter()
 
     batch_count = -(-len(segments) // BATCH_SIZE)  # rounded up
     for batch_start in range(0, len(segments), BATCH_SIZE):
@@ -104,13 +105,16 @@ def refine(
                     f"Segment {segment_id + 1} ({format_time(segment.start)}): kept the original wording "
                     f"because the suggested edit {problem}."
                 )
+                blocked[problem] += 1
                 new_text = segment.text
             refined_texts.append(new_text)
             corrections.extend(find_corrections(segment_id, segment.text, new_text))
 
     # model_copy keeps every other field (timestamps, speaker) exactly as it was.
     refined_segments = [seg.model_copy(update={"text": text}) for seg, text in zip(segments, refined_texts)]
-    return RefinedTranscript(segments=refined_segments, corrections=corrections, warnings=warnings)
+    return RefinedTranscript(
+        segments=refined_segments, corrections=corrections, warnings=warnings, blocked_edits=dict(blocked)
+    )
 
 
 def build_system_prompt(glossary: list[str] | None) -> str:

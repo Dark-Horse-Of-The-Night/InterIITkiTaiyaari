@@ -7,7 +7,7 @@ import openai
 import pytest
 
 from app.pipeline.errors import PipelineError
-from app.pipeline.stt import transcribe, transcribe_file
+from app.pipeline.stt import MAX_HINT_CHARS, confidence_fields, glossary_hint, transcribe, transcribe_file
 from tests.test_audio import make_tone_wav
 
 FAKE_REQUEST = httpx.Request("POST", "https://example.test/v1/audio/transcriptions")
@@ -151,3 +151,90 @@ def test_one_silent_part_of_a_long_recording_is_fine(tmp_path: Path, monkeypatch
     transcript = transcribe_file(upload, client, model="m", max_upload_mb=25)
 
     assert transcript.text == "Hi. Bye."
+
+
+# --- Glossary hint for Whisper ---
+
+
+def test_glossary_is_sent_to_whisper_as_a_hint(tmp_path: Path) -> None:
+    audio = tmp_path / "a.ogg"
+    audio.write_bytes(b"fake")
+    client = FakeWhisperClient(segments=[{"start": 0, "end": 1, "text": "Hello."}])
+
+    transcribe(audio, client, "m", glossary=["Kubernetes", " Priya ", ""])
+
+    assert client.calls[0]["prompt"] == "Terms used in this meeting: Kubernetes, Priya."
+
+
+def test_no_glossary_means_no_hint(tmp_path: Path) -> None:
+    audio = tmp_path / "a.ogg"
+    audio.write_bytes(b"fake")
+    client = FakeWhisperClient(segments=[{"start": 0, "end": 1, "text": "Hello."}])
+
+    transcribe(audio, client, "m")
+
+    assert "prompt" not in client.calls[0]
+
+
+def test_long_glossary_is_cut_to_whisper_prompt_size() -> None:
+    hint = glossary_hint([f"term{i}" for i in range(500)])
+
+    assert hint is not None and len(hint) < MAX_HINT_CHARS + 40
+    assert hint.endswith(".") and "term0" in hint and "term499" not in hint
+
+
+def test_glossary_reaches_every_part_of_a_long_recording(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.pipeline.audio as audio_module
+    from tests.test_audio import make_wav_with_pauses
+
+    monkeypatch.setattr(audio_module, "CHUNK_SECONDS", 10)
+    upload = make_wav_with_pauses(tmp_path / "long.wav", [("tone", 25.0)])
+    client = FakeWhisperClient(segments=[{"start": 0, "end": 1, "text": "Hi."}])
+
+    transcribe_file(upload, client, model="m", max_upload_mb=25, glossary=["ONNX"])
+
+    assert len(client.calls) > 1
+    assert all(call["prompt"] == "Terms used in this meeting: ONNX." for call in client.calls)
+
+
+# --- Whisper confidence ("unclear audio") ---
+
+
+def whisper_segment(avg_logprob: float | None, no_speech: float = 0.01, compression: float = 1.5) -> SimpleNamespace:
+    return SimpleNamespace(avg_logprob=avg_logprob, no_speech_prob=no_speech, compression_ratio=compression)
+
+
+@pytest.mark.parametrize(
+    ("segment", "unclear"),
+    [
+        (whisper_segment(-0.15), False),  # clean speech
+        (whisper_segment(-0.33), False),  # short clean ending, still fine
+        (whisper_segment(-0.59), True),  # heavy noise, words dropped
+        (whisper_segment(-0.1, no_speech=0.8), True),  # probably not speech
+        (whisper_segment(-0.1, compression=3.0), True),  # repeating itself
+    ],
+)
+def test_unclear_audio_is_flagged_from_whispers_own_scores(segment: SimpleNamespace, unclear: bool) -> None:
+    assert confidence_fields(segment)["unclear"] is unclear
+
+
+def test_confidence_is_a_probability() -> None:
+    assert confidence_fields(whisper_segment(-0.15))["confidence"] == 0.86
+
+
+def test_providers_without_scores_leave_confidence_empty() -> None:
+    assert confidence_fields(SimpleNamespace(text="hi")) == {}
+
+
+def test_confidence_survives_long_recording_time_shift(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.pipeline.audio as audio_module
+    from tests.test_audio import make_wav_with_pauses
+
+    monkeypatch.setattr(audio_module, "CHUNK_SECONDS", 10)
+    upload = make_wav_with_pauses(tmp_path / "long.wav", [("tone", 25.0)])
+    client = FakeWhisperClient(segments=[{"start": 1, "end": 2, "text": "Hi.", "avg_logprob": -0.7, "no_speech_prob": 0.0, "compression_ratio": 1.2}])
+
+    transcript = transcribe_file(upload, client, model="m", max_upload_mb=25)
+
+    assert all(s.unclear and s.confidence == 0.5 for s in transcript.segments)
+    assert transcript.segments[-1].start > 10  # shifted, and the scores kept

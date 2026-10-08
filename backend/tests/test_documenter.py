@@ -186,4 +186,23 @@ def test_schema_leaves_out_code_filled_fields() -> None:
 
     assert '"warnings"' not in schema_text
     assert '"start"' not in schema_text
+    assert '"unclear"' not in schema_text
+    assert '"fix_counts"' not in schema_text
     assert '"owner"' in schema_text
+
+
+def test_fixes_are_counted_by_kind() -> None:
+    items = make_record()["action_items"]
+    items[1]["owner"] = "Ravi"  # unstated detail
+    decisions = [{"text": "Adopt Kafka.", "evidence": evidence([5], "We agreed to adopt Kafka")}]  # unsupported
+    record = document(TRANSCRIPT, FakeChatClient(make_record(action_items=items, decisions=decisions)), model="fake")
+
+    assert record.fix_counts == {"unsupported_item": 1, "unstated_detail": 1}
+
+
+def test_items_quoting_unclear_audio_are_marked() -> None:
+    segments = [s.model_copy(update={"unclear": i == 5}) for i, s in enumerate(TRANSCRIPT.segments)]
+    record = document(Transcript(segments=segments), FakeChatClient(make_record()), model="fake")
+
+    assert record.decisions[0].evidence.unclear is True  # quotes segment 5
+    assert record.action_items[0].evidence.unclear is False

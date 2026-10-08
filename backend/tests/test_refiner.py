@@ -95,6 +95,8 @@ def test_unsafe_edits_are_rejected(original: str, bad_edit: str, reason: str) ->
     assert refined.corrections == []
     assert len(refined.warnings) == 1
     assert reason in refined.warnings[0]
+    assert sum(refined.blocked_edits.values()) == 1
+    assert reason in next(iter(refined.blocked_edits))
 
 
 @pytest.mark.parametrize(

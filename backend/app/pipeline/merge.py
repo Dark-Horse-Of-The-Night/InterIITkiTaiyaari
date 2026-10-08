@@ -78,6 +78,7 @@ def merge_parts(
         action_items=[i for i in kept.values() if isinstance(i, ActionItem)],
         open_items=[i for i in kept.values() if isinstance(i, OpenItem)],
         warnings=warnings,
+        fix_counts={"superseded": len(removed)} if removed else {},
     )
 
 

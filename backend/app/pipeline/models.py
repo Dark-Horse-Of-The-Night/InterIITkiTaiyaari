@@ -14,6 +14,10 @@ class Segment(BaseModel):
     # Who spoke: a name if one was identified from the audio, else a label like "Speaker 2".
     # None when speaker labelling is off or unavailable.
     speaker: str | None = None
+    # How sure Whisper was about this stretch of audio (0-1), and whether that is low enough to
+    # be worth a listen. Whisper scores ~30-second windows, so neighbouring segments share a score.
+    confidence: float | None = None
+    unclear: bool = False
 
 
 class Transcript(BaseModel):
@@ -51,11 +55,13 @@ class RefinedTranscript(Transcript):
     `corrections` is computed by comparing old and new text, not taken from the model.
     `warnings` lists segments where an edit was rejected and the original wording kept.
     `speaker_names` lists labels replaced by real names; other labels stay "Speaker N".
+    `blocked_edits` counts rejected edits by reason, e.g. {"changed a number": 1}.
     """
 
     corrections: list[Correction] = []
     warnings: list[str] = []
     speaker_names: list[SpeakerName] = []
+    blocked_edits: dict[str, int] = {}
 
 
 # --- Meeting record (output of the documenter) ---
@@ -75,6 +81,7 @@ class Evidence(RecordModel):
     segment_ids: list[int]
     quote: str
     start: float | None = None  # seconds; set by code from the first segment
+    unclear: bool = False  # set by code: the quote comes from audio Whisper was unsure about
 
 
 class Topic(RecordModel):
@@ -113,3 +120,48 @@ class MeetingRecord(RecordModel):
     action_items: list[ActionItem]
     open_items: list[OpenItem]
     warnings: list[str] = []  # problems the code checks found and fixed
+    # How many fixes of each kind the checks made, e.g. {"unsupported_item": 1}. Filled in by code.
+    fix_counts: dict[str, int] = {}
+
+
+# --- Computed by code after the documenter (no model involved) ---
+
+
+class TrustReport(BaseModel):
+    """What the automatic checks verified, removed or blocked for this recording."""
+
+    items_verified: int  # decisions, tasks and open items whose quote was found in the transcript
+    items_removed: int  # items dropped because their quote was not in the transcript
+    details_removed: int  # owners, deadlines or names the model guessed but nobody said
+    items_superseded: int  # long meetings: proposals later accepted, decisions later changed
+    owners_unspecified: int  # tasks left without an owner because none was stated
+    deadlines_unspecified: int
+    corrections: int  # term fixes the refiner made
+    edits_blocked: dict[str, int]  # refiner edits rejected, by reason
+    speakers_named: int  # speakers named from evidence in the recording
+    speakers_unnamed: int  # speakers kept as "Speaker N"
+    unclear_segments: int  # transcript lines from audio Whisper was unsure about
+    unclear_items: int  # record items whose quote comes from such audio
+    notes: list[str]  # every adjustment, in plain English
+
+
+class SpeakerStats(BaseModel):
+    speaker: str
+    seconds: float  # total talk time
+    share: float  # fraction of all talk time (0-1)
+    turns: int  # times they took the floor
+    longest_turn_seconds: float
+    questions: int  # lines they spoke that end with "?"
+
+
+class SpeakingTurn(BaseModel):
+    speaker: str
+    start: float
+    end: float
+
+
+class SpeakingStats(BaseModel):
+    """Who spoke how much, worked out from the speaker labels and timestamps."""
+
+    speakers: list[SpeakerStats]  # most talk time first
+    timeline: list[SpeakingTurn]  # consecutive lines by the same speaker joined into one turn
