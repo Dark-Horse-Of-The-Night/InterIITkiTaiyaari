@@ -24,7 +24,7 @@ export function makeResult(): MeetingResult {
     { start: 4, end: 8, text: 'Arjun proposed switching our CI/CD pipeline to GitHub Actions.' },
     { start: 68, end: 72, text: 'Someone needs to update the Swagger docs.' },
   ]
-  return {
+  const result: MeetingResult = {
     raw_transcript: {
       segments: [segments[0], { ...segments[1], text: 'Arjun proposed switching our CICD pipeline to GitHub Actions.' }, segments[2]],
     },
@@ -50,6 +50,9 @@ export function makeResult(): MeetingResult {
     models: { 'Speech-to-text': 'whisper-large-v3' },
     timings_seconds: { 'Speech-to-text': 2.5 },
   }
+  // The server builds the JSON download from the record plus the code-made reports.
+  result.record_json = JSON.stringify({ ...result.record, trust_report: { items_verified: 4 } }, null, 2)
+  return result
 }
 
 /** Replace fetch with a fake that returns the given replies in order (objects -> 200 JSON).

@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import { formatTime } from '../format'
 import type { Evidence, MeetingRecord, MeetingResult } from '../types'
 import { PersonChip } from './Brand'
+import { WhoSpoke } from './SpeakingStats'
+import TrustReport from './TrustReport'
 
 interface Props {
   record: MeetingRecord
@@ -18,6 +20,8 @@ export default function RecordView({ record, result, onPlay }: Props) {
         <h2 className="display mb-2 text-xl">In short</h2>
         <p className="text-[16.5px] leading-relaxed text-ink-2">{record.summary}</p>
       </section>
+
+      {result?.trust && <TrustReport trust={result.trust} />}
 
       <Card title="To-dos" empty={record.action_items.length === 0} emptyText="No tasks came out of this meeting.">
         <ul className="flex flex-col gap-2.5">
@@ -36,6 +40,7 @@ export default function RecordView({ record, result, onPlay }: Props) {
                   ) : (
                     <span className="chip border-[1.5px] border-dashed border-line-strong text-muted">No deadline</span>
                   )}
+                  {item.evidence.unclear && <CheckAudio />}
                 </div>
               </div>
               <TimeButton evidence={item.evidence} onPlay={onPlay} />
@@ -100,7 +105,9 @@ export default function RecordView({ record, result, onPlay }: Props) {
         </div>
       </Card>
 
-      {record.warnings.length > 0 && (
+      {result?.speaking && result.speaking.speakers.length > 1 && <WhoSpoke speaking={result.speaking} />}
+
+      {!result?.trust && record.warnings.length > 0 && (
         <Card title="Notes on this record">
           <p className="mb-2 text-sm text-muted">Automatic checks adjusted the following:</p>
           <ul className="flex list-disc flex-col gap-1.5 pl-5 text-[14.5px] text-ink-2">
@@ -154,7 +161,17 @@ function Quote({ evidence, onPlay }: { evidence: Evidence; onPlay?: (seconds: nu
     <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
       <TimeButton evidence={evidence} onPlay={onPlay} />
       <q className="italic">{evidence.quote}</q>
+      {evidence.unclear && <CheckAudio />}
     </p>
+  )
+}
+
+/** The quote comes from audio that speech recognition was unsure about. */
+function CheckAudio() {
+  return (
+    <span className="chip bg-sun text-sun-ink not-italic" title="Speech recognition was unsure about this part of the audio. Worth a listen.">
+      ⚠ check audio
+    </span>
   )
 }
 

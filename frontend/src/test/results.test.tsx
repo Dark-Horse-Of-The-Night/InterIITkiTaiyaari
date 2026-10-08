@@ -169,7 +169,7 @@ describe('Downloads', () => {
     expect(saved.map((s) => s.name)).toEqual(['Sprint Sync-record.md', 'Sprint Sync-record.json'])
     expect(await saved[0].blob.text()).toBe(result.markdown)
     const json = JSON.parse(await saved[1].blob.text())
-    expect(json).toEqual(result.record)
+    expect(json).toMatchObject(result.record) // the record, plus the trust report
     expect(json.action_items[1].owner).toBeNull() // null stays null in JSON
   })
 
@@ -180,5 +180,103 @@ describe('Downloads', () => {
 
     expect(saved[0].name).toBe('Sprint Sync-raw-transcript.txt')
     expect(await saved[0].blob.text()).toContain('[00:04] Arjun proposed switching our CICD pipeline')
+  })
+})
+
+function withExtras(): MeetingResult {
+  const result = makeResult()
+  result.refined_transcript.segments = result.refined_transcript.segments.map((s, i) => ({
+    ...s,
+    speaker: i === 1 ? 'Arjun' : 'Speaker 1',
+    unclear: i === 2,
+    confidence: i === 2 ? 0.55 : 0.88,
+  }))
+  result.record.action_items[1].evidence.unclear = true
+  result.trust = {
+    items_verified: 4,
+    items_removed: 1,
+    details_removed: 1,
+    items_superseded: 0,
+    owners_unspecified: 1,
+    deadlines_unspecified: 1,
+    corrections: 1,
+    edits_blocked: { 'changed a number': 1 },
+    speakers_named: 1,
+    speakers_unnamed: 1,
+    unclear_segments: 1,
+    unclear_items: 1,
+    notes: ["Removed owner 'Ravi' from action item 'Update the Swagger docs': not stated in the recording near that point."],
+  }
+  result.speaking = {
+    speakers: [
+      { speaker: 'Speaker 1', seconds: 8, share: 0.67, turns: 2, longest_turn_seconds: 4, questions: 1 },
+      { speaker: 'Arjun', seconds: 4, share: 0.33, turns: 1, longest_turn_seconds: 4, questions: 0 },
+    ],
+    timeline: [
+      { speaker: 'Speaker 1', start: 0, end: 4 },
+      { speaker: 'Arjun', start: 4, end: 8 },
+      { speaker: 'Speaker 1', start: 68, end: 72 },
+    ],
+  }
+  return result
+}
+
+describe('Trust report, speaking stats and unclear audio', () => {
+  it('shows the trust report counts and what the checks changed', async () => {
+    renderResults(withExtras())
+    const card = screen.getByRole('region', { name: 'Trust report' })
+
+    expect(within(card).getByText('items backed by a quote').previousSibling).toHaveTextContent('4')
+    expect(within(card).getByText('guesses removed').previousSibling).toHaveTextContent('2')
+    expect(within(card).getByText('risky edit blocked')).toBeInTheDocument()
+    expect(within(card).getByText(/1 owner and 1 deadline left Unspecified/)).toBeInTheDocument()
+
+    await userEvent.click(within(card).getByRole('button', { name: /See what the checks changed/ }))
+    expect(within(card).getByText(/Removed owner 'Ravi'/)).toBeInTheDocument()
+  })
+
+  it('marks record items that quote unclear audio', () => {
+    renderResults(withExtras())
+    const todos = within(screen.getByRole('heading', { name: 'To-dos' }).parentElement!).getAllByRole('listitem')
+
+    expect(within(todos[1]).getByText('⚠ check audio')).toBeInTheDocument()
+    expect(within(todos[0]).queryByText('⚠ check audio')).not.toBeInTheDocument()
+  })
+
+  it('shows who spoke how much', () => {
+    renderResults(withExtras())
+    const card = screen.getByRole('region', { name: 'Who spoke' })
+
+    expect(within(card).getByText('67%')).toBeInTheDocument()
+    expect(within(card).getByText(/2 turns · 1 question/)).toBeInTheDocument()
+  })
+
+  it('plays from a block on the speaking timeline', async () => {
+    renderResults(withExtras(), recording())
+
+    await userEvent.click(screen.getByRole('listitem', { name: /Play Arjun, 00:04/ }))
+    expect(played).toContain(4)
+  })
+
+  it('highlights unclear lines in the transcript', async () => {
+    renderResults(withExtras())
+    await userEvent.click(screen.getByRole('tab', { name: /Refined transcript/ }))
+
+    expect(screen.getByTitle(/Speech recognition was unsure here \(55% confident\)/)).toHaveTextContent('Swagger docs')
+    expect(screen.getByText(/where speech recognition itself was unsure/)).toBeInTheDocument()
+  })
+
+  it('downloads the server-built JSON, which includes the trust report', async () => {
+    renderResults()
+    await userEvent.click(screen.getByRole('button', { name: 'JSON' }))
+
+    expect(await saved[0].blob.text()).toContain('"trust_report"')
+  })
+
+  it('works for older results without the extras', () => {
+    renderResults()
+
+    expect(screen.queryByRole('region', { name: 'Trust report' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Who spoke' })).not.toBeInTheDocument()
   })
 })

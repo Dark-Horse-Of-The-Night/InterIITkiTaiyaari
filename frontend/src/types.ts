@@ -6,6 +6,8 @@ export interface Segment {
   end: number
   text: string
   speaker?: string | null // a name if identified from the recording, else "Speaker 2"; absent if labels are off
+  confidence?: number | null // how sure Whisper was about this stretch (0-1)
+  unclear?: boolean // Whisper was unsure here: worth a listen
 }
 
 export interface Transcript {
@@ -30,12 +32,14 @@ export interface RefinedTranscript extends Transcript {
   corrections: Correction[]
   warnings: string[]
   speaker_names?: SpeakerName[]
+  blocked_edits?: Record<string, number> // refiner edits rejected by the code checks, by reason
 }
 
 export interface Evidence {
   segment_ids: number[]
   quote: string
   start: number | null
+  unclear?: boolean // the quote comes from audio Whisper was unsure about
 }
 
 export interface Topic {
@@ -72,11 +76,51 @@ export interface MeetingRecord {
   warnings: string[]
 }
 
+/** What the automatic checks verified, removed or blocked (computed by code, no model). */
+export interface TrustReport {
+  items_verified: number
+  items_removed: number
+  details_removed: number
+  items_superseded: number
+  owners_unspecified: number
+  deadlines_unspecified: number
+  corrections: number
+  edits_blocked: Record<string, number>
+  speakers_named: number
+  speakers_unnamed: number
+  unclear_segments: number
+  unclear_items: number
+  notes: string[]
+}
+
+export interface SpeakerStats {
+  speaker: string
+  seconds: number
+  share: number // 0-1
+  turns: number
+  longest_turn_seconds: number
+  questions: number
+}
+
+export interface SpeakingTurn {
+  speaker: string
+  start: number
+  end: number
+}
+
+export interface SpeakingStats {
+  speakers: SpeakerStats[] // most talk time first
+  timeline: SpeakingTurn[]
+}
+
 export interface MeetingResult {
   raw_transcript: Transcript
   refined_transcript: RefinedTranscript
   record: MeetingRecord
+  trust?: TrustReport
+  speaking?: SpeakingStats | null // null when there are no speaker labels
   markdown: string
+  record_json?: string // the JSON download, built by the server from the same data as `markdown`
   models: Record<string, string>
   timings_seconds: Record<string, number>
 }

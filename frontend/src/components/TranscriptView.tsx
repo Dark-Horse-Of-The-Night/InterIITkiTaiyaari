@@ -26,6 +26,7 @@ export default function TranscriptView({ transcript, corrections, warnings = [],
   const turns = groupTurns(transcript)
   const karaoke = player && (player.playing || player.time > 0)
   const current = karaoke ? lastIndexStartedBy(transcript, player.time) : -1
+  const unclear = segments.filter((s) => s.unclear).length
 
   return (
     <div className="flex flex-col gap-4">
@@ -79,13 +80,15 @@ export default function TranscriptView({ transcript, corrections, warnings = [],
                     const changes = corrections?.filter((c) => c.segment_id === i) ?? []
                     const text = changes.length ? highlight(segments[i].text, changes) : segments[i].text
                     const dim = karaoke && i > current
+                    const unsure = segments[i].unclear
+                    const tip = unsure ? `Speech recognition was unsure here${confidenceText(segments[i].confidence)}. Worth a listen.` : undefined
                     return (
-                      <span key={i}>
+                      <span key={i} className={unsure ? 'unclear-audio' : undefined} title={tip}>
                         {player ? (
                           <button
                             type="button"
                             onClick={() => player.seek(segments[i].start)}
-                            title={`Play from ${formatTime(segments[i].start)}`}
+                            title={tip ?? `Play from ${formatTime(segments[i].start)}`}
                             className={`cursor-pointer rounded text-left transition-opacity hover:bg-orange-track/60 ${dim ? 'opacity-55' : ''} ${i === current ? 'font-semibold' : ''}`}
                           >
                             {text}
@@ -111,6 +114,12 @@ export default function TranscriptView({ transcript, corrections, warnings = [],
           : 'Exactly as the speech recognition heard it.'}
         {player && ' Click any line to play it.'}
       </p>
+      {unclear > 0 && (
+        <p className="flex items-center gap-2 text-sm text-sun-ink">
+          <span className="unclear-audio px-1">dotted lines</span>
+          {unclear === 1 ? 'is a stretch' : 'are stretches'} where speech recognition itself was unsure: worth a listen.
+        </p>
+      )}
       {refined && warnings.length > 0 && (
         <div className="rounded-2xl bg-sun-soft px-4 py-3 text-sm text-sun-ink">
           <p className="font-semibold">Kept the original wording here (the suggested edit wasn't safe):</p>
@@ -163,6 +172,10 @@ function highlight(text: string, corrections: Correction[]): ReactNode {
   })
   parts.push(text.slice(cursor))
   return parts
+}
+
+function confidenceText(confidence: number | null | undefined): string {
+  return confidence == null ? '' : ` (${Math.round(confidence * 100)}% confident)`
 }
 
 function capitalise(text: string): string {

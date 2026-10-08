@@ -6,6 +6,7 @@ import type { MeetingResult } from '../types'
 import { usePlayer } from '../usePlayer'
 import AudioPlayer from './AudioPlayer'
 import RecordView from './RecordView'
+import { SpeakingTimeline } from './SpeakingStats'
 import TranscriptView from './TranscriptView'
 
 type TabId = 'record' | 'refined' | 'raw'
@@ -38,12 +39,13 @@ export default function Results({ result, filename, file = null }: Props) {
     { label: count(result.record.action_items.length, 'to-do'), tone: 'bg-sun-soft text-sun-ink' },
     { label: `${count(corrections, 'term')} fixed`, tone: 'bg-mint-soft text-mint-ink' },
     ...(speakers ? [{ label: count(speakers, 'speaker'), tone: 'bg-sky-soft text-sky-ink' }] : []),
+    ...(result.trust?.unclear_segments ? [{ label: count(result.trust.unclear_segments, 'unclear spot'), tone: 'bg-sun text-sun-ink' }] : []),
   ]
 
   // All four files are built from data already in the browser; the server stores nothing.
   const downloads = [
     { label: 'Markdown', name: `${stem}-record.md`, content: () => result.markdown, type: 'text/markdown', primary: true },
-    { label: 'JSON', name: `${stem}-record.json`, content: () => JSON.stringify(result.record, null, 2), type: 'application/json' },
+    { label: 'JSON', name: `${stem}-record.json`, content: () => result.record_json ?? JSON.stringify(result.record, null, 2), type: 'application/json' },
     { label: 'Refined .txt', name: `${stem}-refined-transcript.txt`, content: () => transcriptToText(result.refined_transcript), type: 'text/plain' },
     { label: 'Raw .txt', name: `${stem}-raw-transcript.txt`, content: () => transcriptToText(result.raw_transcript), type: 'text/plain' },
   ]
@@ -76,6 +78,15 @@ export default function Results({ result, filename, file = null }: Props) {
       {player.available && (
         <div className="rise-in mt-6 [animation-delay:80ms]">
           <AudioPlayer player={player} file={file} fallbackDuration={lastSegment?.end ?? 0} />
+        </div>
+      )}
+      {result.speaking && result.speaking.speakers.length > 1 && (
+        <div className="rise-in [animation-delay:110ms]">
+          <SpeakingTimeline
+            speaking={result.speaking}
+            duration={player.duration || (lastSegment?.end ?? 0)}
+            onPlay={player.available ? player.seek : undefined}
+          />
         </div>
       )}
 

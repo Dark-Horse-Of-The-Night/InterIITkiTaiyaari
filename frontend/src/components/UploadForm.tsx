@@ -138,8 +138,12 @@ export default function UploadForm({ onSubmit, uploading }: Props) {
             value={glossary}
             onChange={(event) => setGlossary(event.target.value)}
             placeholder="e.g. Kubernetes, Project Atlas, Priya"
+            aria-describedby="glossary-hint"
             className="min-h-[52px] rounded-2xl border-2 border-line bg-ground px-[18px] text-base text-ink placeholder:text-faint focus:border-orange focus:outline-none"
           />
+          <p id="glossary-hint" className="text-[13.5px] text-muted">
+            Helps both the transcription and the jargon fixes get these right.
+          </p>
         </div>
 
         <button
